@@ -1,3 +1,14 @@
+'''
+    Run only if you want to reproduce the whole benchmark from scratch!
+    To successfully run the script you need login into your Google Earth Engine (GEE) account beforehand and specify a Google Cloud project in ../config.yaml.
+    The default values in config.yaml will lead to code failure.
+    The script reads the parquet file with target fluxes and derives MCD12Q1 features for every site.
+    In particular, 2x2 km squares is created for every location and centered in the site coordinates. Then MODIS pixels overlaping with the created buffer are processed using majority
+    voting (the feature is categorical) and saved.
+'''
+
+
+
 import os
 import glob
 import yaml
@@ -38,7 +49,7 @@ with open(config_fname, 'r') as file:
 ee.Authenticate()
 ee.Initialize(project=config['gee_project'])
 
-fluxes = pd.read_parquet('../data/fluxes/target_fluxes.parquet')
+fluxes = pd.read_parquet('../data/target_fluxes.parquet')
 fluxes['TIMESTAMP'] = pd.to_datetime(fluxes.TIMESTAMP, format='%Y%m%d')
 
 bands = ['LC_Type1']

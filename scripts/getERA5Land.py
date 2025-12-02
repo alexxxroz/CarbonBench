@@ -1,3 +1,13 @@
+'''
+    Run only if you want to reproduce the whole benchmark from scratch!
+    To successfully run the script you need login into your Google Earth Engine (GEE) account beforehand and specify a Google Cloud project in ../config.yaml.
+    The default values in config.yaml will lead to code failure.
+    The script reads the parquet file with target fluxes and derives ERA5 Land daily agg features for every site.
+    In particular, 2x2 km squares is created for every location and centered in the site coordinates. Then nearest ERA5 pixels overlaping with the created buffer are saved. 
+    Additionally, here he process 10 coastal sites separately, since they lack a valid pixel in their proximity. To avoid information loss we extend the buffer to get the nearest neighbor.
+'''
+
+
 import os
 import yaml
 import glob
@@ -18,12 +28,10 @@ def getCollection(lat, lon, start_year, end_year):
 
 def make_reducer(buffered_roi):
     def _fn(img):
-        # bilinear interpolation is needed since ~10 sites are masked out in ERA5 Land since proximity to water; 
-        # interpolations allows to preserve these sites
-        vals = img.resample('bilinear')reduceRegion( 
+        vals = img.resample('bilinear').reduceRegion( 
             ee.Reducer.mean(),
             buffered_roi,
-            scale=11132, 
+            scale=2000,
             bestEffort=True,
             maxPixels=1e13
         )
@@ -40,7 +48,7 @@ with open(config_fname, 'r') as file:
 ee.Authenticate()
 ee.Initialize(project=config['gee_project'])
 
-fluxes = pd.read_parquet('../../data/fluxes/target_fluxes.parquet')
+fluxes = pd.read_parquet('../data/target_fluxes.parquet')
 fluxes['TIMESTAMP'] = pd.to_datetime(fluxes.TIMESTAMP, format='%Y%m%d')
 
 # Extract all band names from ERA5 Land daily agg (150 features)
@@ -50,22 +58,21 @@ bands = []
 for band in data.getInfo()['features'][0]['bands']:
     bands.append(band['id'])
 
-if os.path.exists('../data/ERA5.parquet'):
-    df = pd.read_parquet('../data/ERA5.parquet')
-    d = df.to_dict(orient='list')
-    sites = np.unique(df.to_dict(orient='list')['site'])
+if os.path.exists('../data/ERA5'):
+    sites = [x.split('.')[0] for x in os.listdir('../data/ERA5')]
 else:
     sites = []
 
 os.makedirs('../data/ERA5/', exist_ok=True)
+coastal_sites = ["AMF_AR-TF1", "AMF_US-EDN", "AMF_US-HB1", "AMF_US-HB2", "AMF_US-HB3", "AMF_US-KS3", "FLX_IT-Noe", "ICOSETC_DK-RCW", "ICOSETC_IT-Noe", "JPX_JP-Ynf",]
 for site, group in fluxes.groupby(['site']):
-    if site not in sites:
+    if site[0] not in sites:
         lat, lon = group.lat.unique()[0], group.lon.unique()[0]
         
         d = {x: [] for x in ['site', 'date'] + bands}
         for start_year, end_year in zip([2000, 2008, 2016], [2008, 2016, 2024]):
             collection, roi = getCollection(lat, lon, start_year, end_year)
-            buffered = roi.buffer(1000).bounds() # 2km by 2km
+            buffered = roi.buffer(1000).bounds() 
             reducer = make_reducer(buffered)
             
             feature_collection = collection.map(reducer)

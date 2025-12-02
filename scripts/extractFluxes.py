@@ -1,3 +1,9 @@
+'''
+    Run only if you want to reproduce the whole benchmark from scratch!
+    The script is supposed to process raw site-level data provided as csv files (initially zipped),
+    extract targets and stack them and save as a parquet file.
+'''
+
 import pandas as pd
 import zipfile
 from os import listdir
@@ -26,6 +32,7 @@ ameri_files, flux_files, icos_files, jap_files = listdir(ameri_path), listdir(fl
 
 '''Unzip raw files'''
 if unzip:
+    print('Unzipping...')
     for f in ameri_files:
         if '.zip' in f:
             i=0
@@ -61,6 +68,7 @@ icos_dir = [x for x in listdir(icos_path) if (len(x.split('.')) == 1)]
 jap_dir = [x for x in listdir(jap_path) if (x.split('.')[-1] != 'zip')]
 
 '''Extracting FLUXNET time series'''
+print('Processing FLUXNET...')
 data = []
 for folder in flux_dir:
     try:
@@ -74,8 +82,10 @@ for folder in flux_dir:
 data = pd.concat(data, axis=0)
 data = data.reset_index(drop=True)
 data.to_parquet(f'{main_path}/all_fluxnet.parquet', index=None)
+print(f"FLUXNET is processed: extracted {data.site.nunique()} sites")
 
 '''Extracting AmeriFlux time series'''
+print('Processing AmeriFlux...')
 data_ameri = []
 for folder in ameri_dir:
     try:
@@ -88,8 +98,10 @@ for folder in ameri_dir:
 data_ameri = pd.concat(data_ameri, axis=0)
 data_ameri = data_ameri.reset_index(drop=True)
 data_ameri.to_parquet(f'{main_path}/all_ameri.parquet', index=None)
+print(f"AmeriFlux is processed: extracted {data_ameri.site.nunique()} sites")
 
 '''Extracting ICOS time series'''
+print('Processing ICOS...')
 data_icos, igbps = [], {}
 for folder in icos_dir:
     try:
@@ -109,8 +121,10 @@ data_icos = data_icos.reset_index(drop=True)
 IGBP = pd.DataFrame(igbps).T.reset_index(drop=False).rename(columns={0: 'IGBP', 'index': 'site'})
 data_icos.to_parquet(f'{main_path}/all_icos.parquet', index=None)
 IGBP.to_csv(f'{main_path}/icos_IGBPs.csv', index=None)
+print(f"ICOS is processed: extracted {data_icos.site.nunique()} sites")
 
 '''Extracting JapanFlux time series'''
+print('Processing JapanFlux...')
 data_jap = []
 for folder in jap_dir:
     try:
@@ -129,6 +143,7 @@ if len(data_jap) > 0:
     data_jap = pd.concat(data_jap, axis=0).drop_duplicates()
     data_jap = data_jap.reset_index(drop=True)
     data_jap.to_parquet(f'{main_path}/all_jap.parquet', index=None)
+    print(f"JapanFlux is processed: extracted {data_jap.site.nunique()} sites")
 else:
     print('No JapanFlux data exist with these vars')
 
@@ -138,3 +153,4 @@ if type(data_jap)==pd.DataFrame:
 else:
     all_data = pd.concat([data, data_ameri, data_icos], axis=0).reset_index(drop=True)    
 all_data.to_parquet(f'{main_path}/all_fluxes.parquet', index=None)
+print(f'Done! Saved {all_data.site.nunique()} sites.')

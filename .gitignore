@@ -2,6 +2,8 @@
 # Config
 config.yaml
 
+papers/
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

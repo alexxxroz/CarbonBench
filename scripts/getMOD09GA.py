@@ -1,3 +1,12 @@
+'''
+    Run only if you want to reproduce the whole benchmark from scratch!
+    To successfully run the script you need login into your Google Earth Engine (GEE) account beforehand and specify a Google Cloud project in ../config.yaml.
+    The default values in config.yaml will lead to code failure.
+    The script reads the parquet file with target fluxes and derives MOD09GA features for every site.
+    In particular, 2x2 km squares is created for every location and centered in the site coordinates. Then MODIS pixels overlaping with the created buffer are averaged and saved.
+'''
+
+
 import os
 import glob
 import yaml
@@ -47,21 +56,20 @@ with open(config_fname, 'r') as file:
 ee.Authenticate()
 ee.Initialize(project=config['gee_project'])
 
-fluxes = pd.read_parquet('../data/fluxes/target_fluxes.parquet')
+fluxes = pd.read_parquet('../data/target_fluxes.parquet')
 fluxes['TIMESTAMP'] = pd.to_datetime(fluxes.TIMESTAMP, format='%Y%m%d')
 
 surf_refl = [f'sur_refl_b0{i}' for i in range(1,8)]
 bands = surf_refl + ['SensorZenith', 'SensorAzimuth', 'SolarZenith', 'SolarAzimuth', 'state_1km']
 
-if os.path.exists('../data/MOD09GA.parquet'):
-    df = pd.read_parquet('../data/MOD09GA.parquet')
-    sites = np.unique(df.to_dict(orient='list')['site'])
+if os.path.exists('../data/MOD09GA'):
+    sites = [x.split('.')[0] for x in sorted(os.listdir('../data/MOD09GA'))]
 else:
     sites = []
 
 os.makedirs('../data/MOD09GA/', exist_ok=True)
 for site, group in fluxes.groupby(['site']):
-    if site not in sites:
+    if site[0] not in sites:
         lat, lon = group.lat.unique()[0], group.lon.unique()[0]
         d = {x: [] for x in ['site', 'date'] + bands[:-1] + ['clouds']}
         for start_year, end_year in zip([2000, 2008, 2016], [2008, 2016, 2024]): #GEE can't process seq longer than 5k 

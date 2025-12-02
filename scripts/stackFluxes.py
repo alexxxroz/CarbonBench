@@ -1,3 +1,9 @@
+'''
+    Run only if you want to reproduce the whole benchmark from scratch!
+    The script reads the results of extractFluxes.py execution and joins them with meta information such as latitude, longitude and IGBP type.
+    The script save the final parquet file with targets.
+'''
+
 import yaml
 import json
 from time import time
@@ -6,6 +12,9 @@ from os.path import join
 
 import numpy as np
 import pandas as pd
+
+import warnings
+warnings.filterwarnings('ignore')
 
 config_fname = '../config.yaml'
 with open(config_fname, 'r') as file:
@@ -55,6 +64,7 @@ for folder in jap_dir:
     site = site[:10] if len(site)>10 else site
     data_jap['site'].append(site)
 data_jap = pd.DataFrame(data_jap).drop_duplicates()
+data_jap.lat, data_jap.lon = data_jap.lat.astype(float), data_jap.lon.astype(float)
 
 '''Merging fluxes with metadata'''
 flux_merged = df[df['site'].str.startswith('FLX')].merge(
@@ -92,3 +102,4 @@ df.loc[df['site'].str.startswith('JPX'), ['lat', 'lon', 'IGBP']] = jap_merged[['
 df.dropna(inplace=True)
 
 df.to_parquet(f'../data/target_fluxes.parquet', index=None)
+print(f"Targets are stacked!")
