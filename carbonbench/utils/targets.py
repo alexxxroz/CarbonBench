@@ -16,6 +16,8 @@ def load_targets(targets: list=['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NE
     df = df.replace(-9999, np.nan)
     df.TIMESTAMP = pd.to_datetime(df.TIMESTAMP, format='%Y%m%d')
     df = df.rename(columns={'TIMESTAMP': 'date'})
+    df = df[df.date>=pd.to_datetime('2000-02-24')] # start date of MODIS obsevations
+
     with open('./data/koppen_sites.json', 'r') as file:
         koppen = json.load(file)
     df['Koppen'] = df['site'].map(koppen)
@@ -27,7 +29,8 @@ def load_targets(targets: list=['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NE
     df.dropna(inplace=True)
     return df
 
-def split_targets(df: pd.DataFrame, verbose: bool=True, plot: bool=True):
+def split_targets(df: pd.DataFrame, split_type: str='zero-shot',
+                  verbose: bool=True, plot: bool=True):
     '''
     This function performs constrained stratified train-test split of targets. It ensures equal startification of sites by Koppen climate class
     and that at least 1 site from every IGBP class is represented in the test dataset.
@@ -65,7 +68,7 @@ def split_targets(df: pd.DataFrame, verbose: bool=True, plot: bool=True):
     test_sites.extend(test_sites_temp)
     train_sites = train_sites_temp
     if verbose:
-        print(f"Train: {len(train_sites)}, Test: {len(test_sites)}")
+        print(f"Train sites: {len(train_sites)}, Test sites: {len(test_sites)}")
 
         test_koppen = site_meta[site_meta.site.isin(test_sites)].Koppen.value_counts(normalize=False)
         all_koppen = site_meta.Koppen.value_counts(normalize=False)
@@ -75,23 +78,40 @@ def split_targets(df: pd.DataFrame, verbose: bool=True, plot: bool=True):
     y_train, y_test = df[df.site.isin(train_sites)], df[df.site.isin(test_sites)] 
     
     if plot:
-        plot_sites(y_train, y_test)
+        plot_sites(y_train.copy(), y_test.copy())
 
-    
-    return y_train, y_test
-
+    if split_type=='zero-shot':
+        return y_train, y_test
+    elif split_type=='few-shot':
+        y_finetune = []
+        y_test_query = []
+        
+        for site in y_test.site.unique():
+            site_df = y_test[y_test.site == site]
+            
+            n_samples = 15  
+            support = site_df.sample(n=n_samples, replace=False, random_state=random_state)
+            query = site_df.drop(support.index)
+            
+            y_finetune.append(support)
+            y_test_query.append(query)
+        
+        y_finetune = pd.concat(y_finetune)
+        y_test = pd.concat(y_test_query) 
+        return y_train, y_test, y_finetune
+        
 def plot_sites(train, test):
     train['type'] = 'train'
     test['type'] = 'test'
     df = pd.concat([train,test])
     
     site_colors = {
-        'test': '#FF0000',  # Tropical - red
-        'train': '#2196F3',  # Continental - blue
+        'test': '#FF0000',  
+        'train': '#2196F3',  
     }
 
     fig = plt.figure(figsize=(16, 10), facecolor='#0a1128') 
-    ax = plt.axes(projection=ccrs.InterruptedGoodeHomolosine())#.)#ccrs.Robinson()
+    ax = plt.axes(projection=ccrs.InterruptedGoodeHomolosine())
 
     ax.set_global()
     ax.add_feature(cfeature.OCEAN, facecolor='#001f54', zorder=0)

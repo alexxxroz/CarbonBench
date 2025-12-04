@@ -64,13 +64,12 @@ else:
     sites = []
 
 os.makedirs('../data/ERA5/', exist_ok=True)
-coastal_sites = ["AMF_AR-TF1", "AMF_US-EDN", "AMF_US-HB1", "AMF_US-HB2", "AMF_US-HB3", "AMF_US-KS3", "FLX_IT-Noe", "ICOSETC_DK-RCW", "ICOSETC_IT-Noe", "JPX_JP-Ynf",]
 for site, group in fluxes.groupby(['site']):
     if site[0] not in sites:
         lat, lon = group.lat.unique()[0], group.lon.unique()[0]
         
         d = {x: [] for x in ['site', 'date'] + bands}
-        for start_year, end_year in zip([2000, 2008, 2016], [2008, 2016, 2024]):
+        for start_year, end_year in zip([2000, 2008, 2016], [2008, 2016, 2025]):
             collection, roi = getCollection(lat, lon, start_year, end_year)
             buffered = roi.buffer(1000).bounds() 
             reducer = make_reducer(buffered)

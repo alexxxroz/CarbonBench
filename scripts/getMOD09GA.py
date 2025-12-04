@@ -72,7 +72,7 @@ for site, group in fluxes.groupby(['site']):
     if site[0] not in sites:
         lat, lon = group.lat.unique()[0], group.lon.unique()[0]
         d = {x: [] for x in ['site', 'date'] + bands[:-1] + ['clouds']}
-        for start_year, end_year in zip([2000, 2008, 2016], [2008, 2016, 2024]): #GEE can't process seq longer than 5k 
+        for start_year, end_year in zip([2000, 2008, 2016], [2008, 2016, 2025]): #GEE can't process seq longer than 5k 
             collection, roi = getCollection(lat, lon, start_year, end_year)
             buffered = roi.buffer(1000).bounds() # 2km by 2km
             reducer = make_reducer(buffered)

@@ -5,6 +5,10 @@ config.yaml
 papers/
 data/
 
+# Download more recent data
+scripts/getERA5Land_extra.py
+scripts/getMOD09GA_extra.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
