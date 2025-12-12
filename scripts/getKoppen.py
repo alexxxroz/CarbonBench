@@ -25,7 +25,7 @@ with open(f'{path}/koppen_classes.json', 'r') as file:
 y = pd.read_parquet('../data/target_fluxes.parquet')    
     
 koppen = xr.open_dataset(f'{path}/koppen_geiger_0p00833333.nc')
-res = {}
+res, res_short = {}, {}
 for site in y.site.unique():
     lat, lon = y[y.site==site].lat.values[0], y[y.site==site].lon.values[0]
     k = koppen.sel(lat=lat, lon=lon, method='nearest').kg_class.item()
@@ -36,7 +36,10 @@ for site in y.site.unique():
         vals, counts = np.unique(NN, return_counts=True)
         k = vals[np.argmax(counts)] 
     res[site] = short_codes[classes[k]]
-
+    res_short[site] = classes[k]
+    
 with open("../data/koppen_sites.json", "w") as outfile:
         json.dump(res, outfile)
-print("Koppen data successfully written to ../data/koppen_sites.json")
+with open("../data/koppen_sites_short.json", "w") as outfile:
+        json.dump(res_short, outfile)
+print("Koppen data successfully written to ../data/koppen_sites.json and ../data/koppen_sites_short.json")

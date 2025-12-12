@@ -1,3 +1,4 @@
+import os
 import json
 import numpy as np
 import pandas as pd
@@ -20,9 +21,12 @@ def load_targets(targets: list=['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NE
 
     with open('./data/koppen_sites.json', 'r') as file:
         koppen = json.load(file)
+    with open('./data/koppen_sites_short.json', 'r') as file:
+        koppen_short = json.load(file)
     df['Koppen'] = df['site'].map(koppen)
+    df['Koppen_short'] = df['site'].map(koppen_short)
     
-    col2keep = ['date', 'site', 'lat', 'lon', 'IGBP', 'Koppen'] + targets
+    col2keep = ['date', 'site', 'lat', 'lon', 'IGBP', 'Koppen', 'Koppen_short'] + targets
     if qc:
         col2keep += ['NEE_VUT_USTAR50_QC']
     df = df[col2keep]
@@ -100,7 +104,10 @@ def split_targets(df: pd.DataFrame, split_type: str='zero-shot',
         y_test = pd.concat(y_test_query) 
         return y_train, y_test, y_finetune
         
-def plot_sites(train, test):
+def plot_sites(train: pd.DataFrame, test: pd.DataFrame, save_path: str=''):
+    '''
+    This function takes train and test dataframes and plots all the sites on the same map.
+    '''
     train['type'] = 'train'
     test['type'] = 'test'
     df = pd.concat([train,test])
@@ -138,6 +145,56 @@ def plot_sites(train, test):
     ax.set_title('CarbonBench: train vs test sites', color='white', fontsize=22)
 
     plt.tight_layout(pad=0)
-#     plt.savefig('sites_map.png', bbox_inches='tight', 
-#                  edgecolor='none') 
+    if len(save_path) > 0:
+        plt.savefig(os.join(save_path, 'sites_map.png'), bbox_inches='tight', edgecolor='none') 
     plt.show()
+    
+def plot_site_ts(df: pd.DataFrame, targets: list, include_qc: bool=True, qc_threshold: int=0.75, site_name: str='random', save_path: str=''):
+    '''
+    This function creates a time series plot for a set of targets from a given or randomly selected site. 
+    If NEE_VUT_USTAR50_QC is included, the areas of high and low data quality are highlighted.
+    '''
+    koppen_map = {
+        'A': 'Tropical',
+        'B': 'Arid',
+        'C': 'Temperate',
+        'D': 'Continental',
+        'E': 'Polar'
+    }
+    if site_name=='random':
+        site_name = np.random.choice(df.site.unique(), 1).item()
+    
+    sub_df = df[df.site==site_name].set_index('date')
+    fig, ax = plt.subplots(figsize=(16,9))
+    sub_df[targets].plot(ax=ax, color=["#543005", "#bf812d", '#003c30'], lw=0.5)
+    ymin = sub_df[targets].min().min()
+    ymax = sub_df[targets].max().max()
+    
+    if include_qc:
+        # Low QC shading (<0.75)
+        ax.fill_between(
+            sub_df.index,
+            ymin, ymax,
+            where=sub_df['NEE_VUT_USTAR50_QC'] < qc_threshold,
+            color='red',
+            alpha=0.2,
+            interpolate=True
+        )
+
+        # High QC shading (>=0.75)
+        ax.fill_between(
+            sub_df.index,
+            ymin, ymax,
+            where=sub_df['NEE_VUT_USTAR50_QC'] >= qc_threshold,
+            color='green',
+            alpha=0.1,
+            interpolate=True
+        )
+    ax.grid(0.5, ls='--', color='grey')
+    ax.set_title(f"Site: {site_name}, IGBP: {sub_df.IGBP.unique()[0]}, Koppen: {koppen_map[sub_df.Koppen.unique()[0]]}")
+    plt.tight_layout()
+    if len(save_path) > 0:
+        plt.savefig(os.join(save_path, f'{site_name}_ts.png')) 
+    plt.show()
+        
+    
