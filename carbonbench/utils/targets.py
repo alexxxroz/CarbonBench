@@ -11,17 +11,21 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
+BASE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.join(BASE, "..", "..")
+DATA = os.path.join(ROOT, "data")
+
 def load_targets(targets: list=['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NEE_VUT_USTAR50'],
                  qc: bool=True):
-    df = pd.read_parquet('./data/target_fluxes.parquet')
+    df = pd.read_parquet(f'{DATA}/target_fluxes.parquet')
     df = df.replace(-9999, np.nan)
     df.TIMESTAMP = pd.to_datetime(df.TIMESTAMP, format='%Y%m%d')
     df = df.rename(columns={'TIMESTAMP': 'date'})
     df = df[df.date>=pd.to_datetime('2000-02-24')] # start date of MODIS obsevations
 
-    with open('./data/koppen_sites.json', 'r') as file:
+    with open(f'{DATA}/koppen_sites.json', 'r') as file:
         koppen = json.load(file)
-    with open('./data/koppen_sites_short.json', 'r') as file:
+    with open(f'{DATA}/koppen_sites_short.json', 'r') as file:
         koppen_short = json.load(file)
     df['Koppen'] = df['site'].map(koppen)
     df['Koppen_short'] = df['site'].map(koppen_short)
@@ -89,19 +93,19 @@ def split_targets(df: pd.DataFrame, split_type: str='zero-shot',
     elif split_type=='few-shot':
         y_finetune = []
         y_test_query = []
-        
+
         for site in y_test.site.unique():
-            site_df = y_test[y_test.site == site]
-            
+            site_df = y_test[y_test.site == site].sort_values('date')
+
             n_samples = 15  
-            support = site_df.sample(n=n_samples, replace=False, random_state=random_state)
-            query = site_df.drop(support.index)
-            
+            support = site_df.iloc[:n_samples]
+            query = site_df.iloc[n_samples:]
+
             y_finetune.append(support)
             y_test_query.append(query)
-        
+
         y_finetune = pd.concat(y_finetune)
-        y_test = pd.concat(y_test_query) 
+        y_test = pd.concat(y_test_query)
         return y_train, y_test, y_finetune
         
 def plot_sites(train: pd.DataFrame, test: pd.DataFrame, save_path: str=''):

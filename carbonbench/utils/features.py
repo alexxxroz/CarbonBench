@@ -1,3 +1,4 @@
+import os
 import json
 import numpy as np
 import pandas as pd
@@ -6,17 +7,22 @@ from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+BASE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.join(BASE, "..", "..")
+DATA = os.path.join(ROOT, "data")
+
+
 def load_modis():
-    df = pd.read_parquet('./data/MOD09GA.parquet')
+    df = pd.read_parquet(f'{DATA}/MOD09GA.parquet')
     df.date = pd.to_datetime(df.date)
     return df
 
 def load_era(set_type: str='standard'):
-    with open('./data/feature_sets.json', 'r') as file:
+    with open(f'{DATA}/feature_sets.json', 'r') as file:
         features = json.load(file)
     col2keep = ['date', 'site'] + features[set_type]
     
-    df = pd.read_parquet('./data/ERA5.parquet', columns=col2keep)
+    df = pd.read_parquet(f'{DATA}/ERA5.parquet', columns=col2keep)
     df.date = pd.to_datetime(df.date)
     return df
 
@@ -50,6 +56,45 @@ def join_features(y_train: pd.DataFrame, y_test: pd.DataFrame, modis: pd.DataFra
         df_val[targets] = y_scaler.fit_transform(df_val[targets])
         df_test[targets]  = y_scaler.transform(df_test[targets])
         return df_train, df_val, df_test, x_scaler, y_scaler
+    else:
+        return df_train, df_test
+
+def join_features_finetune(y_train: pd.DataFrame, y_finetune: pd.DataFrame, y_test: pd.DataFrame, 
+                           modis: pd.DataFrame, era: pd.DataFrame, val_ratio: float=0.2, scale: bool=True):
+    df_train = y_train.merge(modis, how='left', on=['date', 'site'], sort=False)
+    df_train = df_train.merge(era, how='left', on=['date','site'], sort=False)
+    
+    df_finetune = y_finetune.merge(modis, how='left', on=['date', 'site'], sort=False)
+    df_finetune = df_finetune.merge(era, how='left', on=['date','site'], sort=False)
+    
+    df_test = y_test.merge(modis, how='left', on=['date', 'site'], sort=False)
+    df_test = df_test.merge(era, how='left', on=['date','site'], sort=False)
+    
+    # preparing validation df
+    train, val = [], []
+    for site in df_train.site.unique():
+        site_df = df_train[df_train.site==site]
+        split_idx = int(len(site_df) * (1 - val_ratio))
+        train.append(site_df.iloc[:split_idx])
+        val.append(site_df.iloc[split_idx:])
+
+    df_train = pd.concat(train).reset_index(drop=True)
+    df_val = pd.concat(val).reset_index(drop=True)
+
+    if scale:
+        features = ['lat', 'lon'] + [col for col in era.columns if col not in ['date', 'site']] + [col for col in modis.columns if col not in ['date', 'site']] 
+        targets = [col for col in y_train.columns if 'USTAR50' in col and 'QC' not in col]
+        x_scaler, y_scaler = StandardScaler(), StandardScaler()
+        df_train[features] = x_scaler.fit_transform(df_train[features])
+        df_val[features] = x_scaler.fit_transform(df_val[features])
+        df_finetune[features] = x_scaler.fit_transform(df_finetune[features])
+        df_test[features]  = x_scaler.transform(df_test[features])
+
+        df_train[targets] = y_scaler.fit_transform(df_train[targets])
+        df_val[targets] = y_scaler.fit_transform(df_val[targets])
+        df_finetune[targets] = y_scaler.fit_transform(df_finetune[targets])
+        df_test[targets]  = y_scaler.transform(df_test[targets])
+        return df_train, df_val, df_finetune, df_test, x_scaler, y_scaler
     else:
         return df_train, df_test
     
