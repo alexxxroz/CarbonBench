@@ -49,11 +49,11 @@ def join_features(y_train: pd.DataFrame, y_test: pd.DataFrame, modis: pd.DataFra
         targets = [col for col in y_train.columns if 'USTAR50' in col and 'QC' not in col]
         x_scaler, y_scaler = StandardScaler(), StandardScaler()
         df_train[features] = x_scaler.fit_transform(df_train[features])
-        df_val[features] = x_scaler.fit_transform(df_val[features])
+        df_val[features] = x_scaler.transform(df_val[features])
         df_test[features]  = x_scaler.transform(df_test[features])
 
         df_train[targets] = y_scaler.fit_transform(df_train[targets])
-        df_val[targets] = y_scaler.fit_transform(df_val[targets])
+        df_val[targets] = y_scaler.transform(df_val[targets])
         df_test[targets]  = y_scaler.transform(df_test[targets])
         return df_train, df_val, df_test, x_scaler, y_scaler
     else:
@@ -86,13 +86,13 @@ def join_features_finetune(y_train: pd.DataFrame, y_finetune: pd.DataFrame, y_te
         targets = [col for col in y_train.columns if 'USTAR50' in col and 'QC' not in col]
         x_scaler, y_scaler = StandardScaler(), StandardScaler()
         df_train[features] = x_scaler.fit_transform(df_train[features])
-        df_val[features] = x_scaler.fit_transform(df_val[features])
-        df_finetune[features] = x_scaler.fit_transform(df_finetune[features])
+        df_val[features] = x_scaler.transform(df_val[features])
+        df_finetune[features] = x_scaler.transform(df_finetune[features])
         df_test[features]  = x_scaler.transform(df_test[features])
 
         df_train[targets] = y_scaler.fit_transform(df_train[targets])
-        df_val[targets] = y_scaler.fit_transform(df_val[targets])
-        df_finetune[targets] = y_scaler.fit_transform(df_finetune[targets])
+        df_val[targets] = y_scaler.transform(df_val[targets])
+        df_finetune[targets] = y_scaler.transform(df_finetune[targets])
         df_test[targets]  = y_scaler.transform(df_test[targets])
         return df_train, df_val, df_finetune, df_test, x_scaler, y_scaler
     else:
