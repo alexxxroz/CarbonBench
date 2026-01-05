@@ -18,6 +18,12 @@ class SlidingWindowDataset(Dataset):
         self.include_qc = include_qc
         self.QC_threshold = QC_threshold
         
+        IGBP_CLASSES = ["CRO","CSH","CVM","DBF","DNF","EBF","ENF","GRA","MF","OSH","SAV","SNO","URB","WAT","WET","WSA"]
+        KOPPEN_CLASSES = ["A","B","C","D","E"]
+        self.igbp2id = {c:i for i,c in enumerate(IGBP_CLASSES)}
+        self.koppen2id = {c:i for i,c in enumerate(KOPPEN_CLASSES)}
+        
+        
         df = pd.concat(hist, axis=0)
         # Fit or use provided encoders
         if encoders is None:
@@ -83,11 +89,20 @@ class SlidingWindowDataset(Dataset):
         cat_window = cat_encoded[i : i + self.window_size, :]
         
         y_target = df_y.values[i + self.window_size - self.stride : i + self.window_size, :]
+        qc_w = df_site['NEE_VUT_USTAR50_QC'].values[i + self.window_size - self.stride : i + self.window_size] if self.include_qc else np.ones_like(y_target[:,0])
+        
+        igbp_w = df_site["IGBP"].values[i + self.window_size - self.stride : i + self.window_size]
+        koppen_w = df_site["Koppen"].values[i + self.window_size - self.stride : i + self.window_size]
+        igbp_w = np.array([self.igbp2id.get(v, -1) for v in igbp_w], dtype=np.int64) # -1 for unknown class
+        koppen_w = np.array([self.koppen2id.get(v, -1) for v in koppen_w], dtype=np.int64) # -1 for unknown class
         
         return torch.tensor(x_window, dtype=torch.float32), \
                torch.tensor(cat_window, dtype=torch.float32), \
-               torch.tensor(y_target, dtype=torch.float32)
-
+               torch.tensor(y_target, dtype=torch.float32), \
+               torch.tensor(qc_w, dtype=torch.float32), \
+               torch.from_numpy(igbp_w), \
+               torch.from_numpy(koppen_w)
+    
 def historical_cache(df: pd.DataFrame, era: pd.DataFrame, mod: pd.DataFrame, x_scaler: sklearn.preprocessing._data.StandardScaler, 
                       window_size: int, cat_features: list=['IGBP', 'Koppen', 'Koppen_short']):
     """Precompute extra historical window for every site"""

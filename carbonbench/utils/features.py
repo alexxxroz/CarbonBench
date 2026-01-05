@@ -98,9 +98,9 @@ def join_features_finetune(y_train: pd.DataFrame, y_finetune: pd.DataFrame, y_te
     else:
         return df_train, df_test
     
-def plot_feature_heatmap(df: pd.DataFrame, cat_features: list=['IGBP', 'Koppen', 'Koppen_short'], save_path: str=''):
-    plt.rcParams.update({'font.size': 14, 'font.family':'monospace', 'figure.figsize': (25, 25)})
+def plot_feature_heatmap(df: pd.DataFrame, cat_features: list=['IGBP', 'Koppen', 'Koppen_short'], save_path: str='', figsize: tuple=(25,25)):
+    plt.rcParams.update({'font.size': 14, 'font.family':'monospace', 'figure.figsize': figsize})
     sns.heatmap(df.drop(['date', 'site'] + cat_features, axis=1).corr(), fmt=".2f", annot=True, cmap="BrBG")
     if len(save_path) > 0:
-        plt.savefig(os.join(save_path, f"featrue_heatmap.png"))
+        plt.savefig(os.path.join(save_path, f"featrue_heatmap.png"))
     plt.show()

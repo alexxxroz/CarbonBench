@@ -3,8 +3,8 @@
     To successfully run the script you need login into your Google Earth Engine (GEE) account beforehand and specify a Google Cloud project in ../config.yaml.
     The default values in config.yaml will lead to code failure.
     The script reads the parquet file with target fluxes and derives ERA5 Land daily agg features for every site.
-    In particular, 2x2 km squares is created for every location and centered in the site coordinates. Then nearest ERA5 pixels overlaping with the created buffer are saved. 
-    Additionally, here he process 10 coastal sites separately, since they lack a valid pixel in their proximity. To avoid information loss we extend the buffer to get the nearest neighbor.
+    In particular, 2x2 km squares is created for every location and centered in the site coordinates. Then nearest ERA5 pixels overlapping with the created buffer are saved. 
+    Additionally, here we process 10 coastal sites separately, since they lack a valid pixel in their proximity. To avoid information loss we extend the buffer to get the nearest neighbor.
 '''
 
 

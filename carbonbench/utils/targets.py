@@ -37,7 +37,7 @@ def load_targets(targets: list=['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NE
     df.dropna(inplace=True)
     return df
 
-def split_targets(df: pd.DataFrame, split_type: str='zero-shot',
+def split_targets(df: pd.DataFrame, task_type: str='zero-shot', split_type: str='IGBP',
                   verbose: bool=True, plot: bool=True):
     '''
     This function performs constrained stratified train-test split of targets. It ensures equal startification of sites by Koppen climate class
@@ -50,54 +50,69 @@ def split_targets(df: pd.DataFrame, split_type: str='zero-shot',
         'IGBP': 'first'
     }).reset_index()
 
-    # Step 1: Force rare IGBP classes into test
-    igbp_counts = site_meta.IGBP.value_counts()
-    rare_igbp = igbp_counts[igbp_counts <= 2].index.tolist()
+    if split_type=='IGBP':
+        # Step 1: Force rare (<=10 sites) IGBP classes to be equal split
+        igbp_counts = site_meta.IGBP.value_counts()
+        rare_igbp = igbp_counts[igbp_counts <= 10].index.tolist()
 
-    test_sites = site_meta[site_meta.IGBP.isin(rare_igbp)].site.tolist()
-    remaining = site_meta[~site_meta.IGBP.isin(rare_igbp)].copy()
+        train_sites, test_sites = [], []
+        for igbp in rare_igbp:
+            test_site_igbp = site_meta[site_meta.IGBP==igbp].sample(igbp_counts[igbp] // 2, random_state=random_state)
+            test_sites.extend(test_site_igbp.site)
+            train_site_igbp = site_meta[(site_meta.IGBP==igbp)&(~site_meta.site.isin(test_site_igbp.site))]
+            train_sites.extend(train_site_igbp.site)
 
-    # Step 2: For each remaining IGBP, ensure >=1 in test
-    for igbp_class in remaining.IGBP.unique():
-        igbp_sites = remaining[remaining.IGBP == igbp_class]
-        if igbp_class not in site_meta[site_meta.site.isin(test_sites)].IGBP.values:
-            sampled = igbp_sites.sample(1, random_state=random_state)
-            test_sites.extend(sampled.site.tolist())
-            remaining = remaining[~remaining.site.isin(sampled.site)]
+        # Step 2: Stratified split on remaining by IGBP
+        remaining = site_meta[~site_meta.IGBP.isin(rare_igbp)]
+        train_sites_str, test_sites_str = train_test_split(
+            remaining.site,
+            test_size=0.2,
+            stratify=remaining.IGBP,
+            random_state=random_state
+        )
 
-    # Step 3: Stratified split on remaining by Koppen
-    train_sites_temp, test_sites_temp = train_test_split(
-        remaining.site,
-        test_size=0.2,
-        stratify=remaining.Koppen,
-        random_state=random_state
-    )
-
-    test_sites.extend(test_sites_temp)
-    train_sites = train_sites_temp
+        test_sites.extend(test_sites_str)
+        train_sites.extend(train_sites_str)
+        
+    elif split_type=='Koppen':
+        train_sites, test_sites = train_test_split(
+            site_meta.site,
+            test_size=0.2,
+            stratify=site_meta.Koppen,
+            random_state=random_state
+        )
+    else:
+        raise f"ERROR: uknown split_type={split_type}"
+        
     if verbose:
         print(f"Train sites: {len(train_sites)}, Test sites: {len(test_sites)}")
-
-        test_koppen = site_meta[site_meta.site.isin(test_sites)].Koppen.value_counts(normalize=False)
-        all_koppen = site_meta.Koppen.value_counts(normalize=False)
-        print("\nKoppen balance:")
-        print(pd.DataFrame({'overall': all_koppen, 'test': test_koppen}))
-    
+        
+        if split_type=='Koppen':
+            test_koppen = site_meta[site_meta.site.isin(test_sites)].Koppen.value_counts(normalize=False)
+            all_koppen = site_meta.Koppen.value_counts(normalize=False)
+            print("\nKoppen balance:")
+            print(pd.DataFrame({'overall': all_koppen, 'test': test_koppen}))
+        else:
+            test_igbp = site_meta[site_meta.site.isin(test_sites)].IGBP.value_counts(normalize=False)
+            all_igbp = site_meta.IGBP.value_counts(normalize=False)
+            print("\nIGBP balance:")
+            print(pd.DataFrame({'overall': all_igbp, 'test': test_igbp}))
+            
     y_train, y_test = df[df.site.isin(train_sites)], df[df.site.isin(test_sites)] 
     
     if plot:
-        plot_sites(y_train.copy(), y_test.copy())
+        plot_sites(y_train.copy(), y_test.copy(), split_type)
 
-    if split_type=='zero-shot':
+    if task_type=='zero-shot':
         return y_train, y_test
-    elif split_type=='few-shot':
+    elif task_type=='few-shot':
         y_finetune = []
         y_test_query = []
 
         for site in y_test.site.unique():
             site_df = y_test[y_test.site == site].sort_values('date')
 
-            n_samples = 15  
+            n_samples = 5  
             support = site_df.iloc[:n_samples]
             query = site_df.iloc[n_samples:]
 
@@ -108,7 +123,7 @@ def split_targets(df: pd.DataFrame, split_type: str='zero-shot',
         y_test = pd.concat(y_test_query)
         return y_train, y_test, y_finetune
         
-def plot_sites(train: pd.DataFrame, test: pd.DataFrame, save_path: str=''):
+def plot_sites(train: pd.DataFrame, test: pd.DataFrame, split_type: str='IGBP', save_path: str=''):
     '''
     This function takes train and test dataframes and plots all the sites on the same map.
     '''
@@ -146,7 +161,7 @@ def plot_sites(train: pd.DataFrame, test: pd.DataFrame, save_path: str=''):
     ax.set_facecolor('#001f54')
     ax.spines['geo'].set_visible(False)
     ax.axis('off')
-    ax.set_title('CarbonBench: train vs test sites', color='white', fontsize=22)
+    ax.set_title(f'CarbonBench (split={split_type}): train vs test sites', color='white', fontsize=22)
 
     plt.tight_layout(pad=0)
     if len(save_path) > 0:
@@ -198,7 +213,7 @@ def plot_site_ts(df: pd.DataFrame, targets: list, include_qc: bool=True, qc_thre
     ax.set_title(f"Site: {site_name}, IGBP: {sub_df.IGBP.unique()[0]}, Koppen: {koppen_map[sub_df.Koppen.unique()[0]]}")
     plt.tight_layout()
     if len(save_path) > 0:
-        plt.savefig(os.join(save_path, f'{site_name}_ts.png')) 
+        plt.savefig(os.path.join(save_path, f'{site_name}_ts.png')) 
     plt.show()
         
     

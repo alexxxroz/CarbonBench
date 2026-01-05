@@ -77,7 +77,7 @@ def nn_predict(model: torch.nn.Module, test_loader: DataLoader, architecture: st
     test_preds = []
     test_true = []
     with torch.no_grad():
-        for x, x_static, y in test_loader:
+        for x, x_static, y, _, _, _ in test_loader:
             x, x_static, y = x.to(device), x_static.to(device), y.squeeze().to(device)
             if architecture in ['lstm', 'gru']:
                 preds = model(x)
