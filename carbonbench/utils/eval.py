@@ -43,14 +43,14 @@ def eval_tree_model(X_test: pd.DataFrame, y_test: pd.DataFrame, targets: list, m
     return res
 
 def eval_nn_model(test_dataset: SlidingWindowDataset, test: pd.DataFrame, targets: list, model: torch.nn.Module, 
-                  architecture: str, device: str, y_scaler: StandardScaler, window_size: int=30, cat_features: list=['IGBP', 'Koppen', 'Koppen_short']):
+                  architecture: str, device: str, y_scaler: StandardScaler, batch_size: int=32, window_size: int=30, cat_features: list=['IGBP', 'Koppen', 'Koppen_short']):
     # Evaluation of a torch-based model
     
     res = {target: {'site': [], 'IGBP': [], 'Koppen': [], 'R2': [], 'RMSE': [], 'MAPE': []} for target in targets}
     for site in test_dataset.get_sites():
         site_indices = test_dataset.get_site_indices(site)
         site_subset = Subset(test_dataset, site_indices)
-        site_loader = DataLoader(site_subset, batch_size=10_000, shuffle=False)
+        site_loader = DataLoader(site_subset, batch_size=batch_size, shuffle=False)
         preds, true = nn_predict(model, site_loader, architecture, device)
         if len(preds.shape)==1:
             preds = preds.reshape(1, -1)
@@ -84,7 +84,11 @@ def nn_predict(model: torch.nn.Module, test_loader: DataLoader, architecture: st
             else:
                 preds = model(x, x_static)
             test_preds.append(preds[:,-stride,:].detach().cpu())
-            test_true.append(y.detach().cpu())
+            
+            y_cpu = y.detach().cpu()
+            if y_cpu.dim() == 1:
+                y_cpu = y_cpu.unsqueeze(0)   # restore batch dim
+            test_true.append(y_cpu)
     test_preds = torch.cat(test_preds).squeeze()
     test_true = torch.cat(test_true).squeeze()
     return test_preds, test_true
