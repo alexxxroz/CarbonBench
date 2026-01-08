@@ -16,9 +16,9 @@ class transformer(nn.Module):
         self.register_buffer('pe', pe)
         
         encoder_layer = nn.TransformerEncoderLayer(
-            hidden_dim=hidden_dim,
+            d_model=hidden_dim,  
             nhead=nhead,
-            dim_feedforward=hidden_dim * 2,
+            dim_feedforward=hidden_dim * 4,  
             dropout=dropout,
             batch_first=True
         )
@@ -27,8 +27,8 @@ class transformer(nn.Module):
         
     def forward(self, x_dynamic, x_static):
         x = torch.cat((x_dynamic, x_static), dim=-1)
-        x = self.embedding(x)  # (batch, seq_len, hidden_dim)
-        x = x + self.pe  # add positional encoding
+        x = self.embedding(x)  
+        x = x + self.pe  
         x = self.transformer(x)
         x = self.fc(x)
         return x
@@ -68,9 +68,9 @@ class patch_transformer(nn.Module):
         self.pos_embed = nn.Parameter(torch.randn(1, self.num_patches, self.hidden_dim) * 0.02)
 
         enc_layer = nn.TransformerEncoderLayer(
-            hidden_dim=self.hidden_dim,
+            d_model=self.hidden_dim,  
             nhead=nhead,
-            dim_feedforward=self.hidden_dim * 2,
+            dim_feedforward=self.hidden_dim * 4,  
             dropout=dropout,
             batch_first=True,
         )
@@ -89,10 +89,10 @@ class patch_transformer(nn.Module):
 
         self.head = nn.Sequential(
             nn.LayerNorm(head_in),
-            nn.Linear(head_in, self.hidden_dim * 2),
+            nn.Linear(head_in, self.hidden_dim * 4),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(self.hidden_dim * 2, self.pred_len * self.out_ch),
+            nn.Linear(self.hidden_dim * 4, self.pred_len * self.out_ch),
         )
 
     def forward(self, x_dynamic: torch.Tensor, x_static: torch.Tensor) -> torch.Tensor:
