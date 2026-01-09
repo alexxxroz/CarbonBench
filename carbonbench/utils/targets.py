@@ -108,11 +108,12 @@ def split_targets(df: pd.DataFrame, task_type: str='zero-shot', split_type: str=
     elif task_type=='few-shot':
         y_finetune = []
         y_test_query = []
-
+        
+        fine_tune_ratio = 0.2  
         for site in y_test.site.unique():
             site_df = y_test[y_test.site == site].sort_values('date')
-
-            n_samples = 5  
+        
+            n_samples = int(np.floor(len(site_df)*0.2))
             support = site_df.iloc[:n_samples]
             query = site_df.iloc[n_samples:]
 

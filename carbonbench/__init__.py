@@ -1,9 +1,9 @@
 from .models import transformers
-from .utils import eval
+from .utils import targets
 import importlib
 
 importlib.reload(transformers)
-importlib.reload(eval)
+importlib.reload(targets)
 
 from .utils.targets import load_targets, split_targets, plot_site_ts
 from .utils.features import load_modis, load_era, join_features, join_features_finetune, plot_feature_heatmap

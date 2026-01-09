@@ -105,7 +105,13 @@ class SlidingWindowDataset(Dataset):
     
 def historical_cache(df: pd.DataFrame, era: pd.DataFrame, mod: pd.DataFrame, x_scaler: sklearn.preprocessing._data.StandardScaler, 
                       window_size: int, cat_features: list=['IGBP', 'Koppen', 'Koppen_short']):
-    """Precompute extra historical window for every site"""
+    """
+    Precompute extra historical window for every site
+    
+    Why? The original data is tabular and joined as x_i, y_i. However, for temporal modeling you might need a series of inputs observed before the label was measured.
+    So this function derives an set of features starting at (t_0 - window_size).
+    
+    """
     site_data = {}
     for site in df.site.unique(): 
         df_site = df[df.site==site].copy()
