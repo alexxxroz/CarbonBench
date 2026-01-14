@@ -143,14 +143,16 @@ class SlidingWindowDatasetTAMRL(SlidingWindowDataset):
         df_x = df_site.loc[:, ~df_site.columns.isin(
             self.targets + ['date', 'site'] + self.cat_features)]
 
-        # Remove rows with NaNs in X
-        valid = ~np.isnan(df_x.values).any(axis=1)
-        x_vals = df_x.values[valid]
-        cat_vals = cat_encoded[valid]
+        x_windows = []
+        cat_windows = []
+        for i in range(0, len(df_site) - self.window_size + 1, self.window_size):  # non-overlapping
+            x_win = df_x.values[i : i + self.window_size, :]
+            if not np.isnan(x_win).any():
+                x_windows.append(x_win)
+                cat_windows.append(cat_encoded[i : i + self.window_size, :])
 
-        # Return (seq_len, features) not (num_windows, window_size, features)
-        return (torch.tensor(x_vals, dtype=torch.float32),
-                torch.tensor(cat_vals, dtype=torch.float32))
+        return (torch.tensor(np.stack(x_windows), dtype=torch.float32),
+                torch.tensor(np.stack(cat_windows), dtype=torch.float32))
     
     def _get_sample(self, idx):
         site, i = self.indices[idx]

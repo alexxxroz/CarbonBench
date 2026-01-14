@@ -82,8 +82,7 @@ def eval_nn_model(test_dataset, test, targets, model, architecture, device, y_sc
 
 def eval_tamrl_model(test_dataset, test, targets, forward_model, inverse_model, architecture, device, y_scaler, batch_size=32):
     def predict_fn(loader, site):
-        historical = test_dataset.get_site_historical(site)
-        return tamrl_predict(forward_model, inverse_model, loader, historical, architecture, device)
+        return tamrl_predict(forward_model, inverse_model, loader, architecture, device)
     return _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_size)
 
 def nn_predict(model: torch.nn.Module, test_loader: DataLoader, architecture: str, device: str):
@@ -109,15 +108,13 @@ def nn_predict(model: torch.nn.Module, test_loader: DataLoader, architecture: st
     test_true = torch.cat(test_true).squeeze()
     return test_preds, test_true
 
-def tamrl_predict(forward_model: torch.nn.Module, inverse_model: torch.nn.Module, test_loader: DataLoader, historical: tuple, architecture: str, device: str):
+def tamrl_predict(forward_model: torch.nn.Module, inverse_model: torch.nn.Module, test_loader: DataLoader, architecture: str, device: str):
     # Get prediction from a torch model using stride=1
     stride = 1
     forward_model.eval()
     inverse_model.eval()
     test_preds = []
     test_true = []
-    #site_hist_x, site_hist_cat = historical
-    #site_hist_x, site_hist_cat = site_hist_x.to(device), site_hist_cat.to(device) 
     with torch.no_grad():
         for x, x_static, y, _, _, _, x_sup, x_static_sup in test_loader:
             x, x_static, y, x_sup, x_static_sup = x.to(device), x_static.to(device), y.squeeze().to(device), x_sup.to(device), x_static_sup.to(device)

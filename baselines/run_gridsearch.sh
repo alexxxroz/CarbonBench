@@ -3,9 +3,9 @@
 #SBATCH --job-name=CB_grid
 #SBATCH --output=logs/gridsearch_%j.txt
 #SBATCH --error=logs/gridsearch_err_%j.txt
-#SBATCH --time=48:00:00
-#SBATCH --partition=kgml03 #msigpu
-#SBATCH --gres=gpu:1 #a100:1
+#SBATCH --time=56:00:00
+#SBATCH --partition=msigpu #kgml03 #
+#SBATCH --gres=gpu:a100:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --array=0-13 # 7 (models) * 2 (splits) = 14 
@@ -29,4 +29,4 @@ ARCH_VAL=${ARCHITECTURES[$arch_idx]}
 SPLIT_VAL=${SPLITS[$split_idx]}
 
 
-python3 cross_val.py --model "$ARCH_VAL" --split_type "$SPLIT_VAL" --device "$DEVICE"
+python3 train_gridsearch.py --model "$ARCH_VAL" --split_type "$SPLIT_VAL" --device "$DEVICE"

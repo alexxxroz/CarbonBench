@@ -5,6 +5,7 @@ import sys
 import json
 import argparse
 import itertools
+import traceback
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -20,6 +21,12 @@ from tqdm import tqdm
 import carbonbench
 
 from utils import train_tamrl
+
+# ANSI color codes
+class Colors:
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    RESET = '\033[0m'
 
 def parse_args():
     parser = argparse.ArgumentParser(description='CarbonBench Hyperparameter Grid Search')
@@ -68,27 +75,28 @@ def get_param_grid(model_name):
     # grid for actual search
     if model_name in ['lstm', 'gru', 'ctlstm', 'ctgru']:
         return {
-            'hidden_dim': [64, 128, 256],
-            'dropout': [0.1, 0.2, 0.3],
-            'lr': [5e-4, 1e-3, 2e-3],
+            'hidden_dim': [128, 256],
+            'dropout': [0.2, 0.3],
+            'lr': [5e-4, 1e-3],
             'layers': [1, 2],
         }
     elif model_name=='tam-rl':
         return {
-            'hidden_dim': [64, 128, 256],
+            'hidden_dim': [128, 256],
             'latent_dim': [32, 64],
-            'dropout': [0.1, 0.2, 0.3],
-            'lr': [5e-4, 1e-3, 2e-3],
+            'dropout': [0.2, 0.3],
+            'lr': [1e-4, 1e-3],
             'layers': [1, 2],
         }
     else:  # transformer, patch_transformer
         return {
-            'hidden_dim': [64, 128, 256],
-            'dropout': [0.1, 0.2, 0.3],
-            'lr': [1e-4, 5e-4, 1e-3],
-            'nhead': [2, 4, 8],
+            'hidden_dim': [128, 256],
+            'dropout': [0.2, 0.3],
+            'lr': [5e-4, 1e-3],
+            'nhead': [4, 8],
             'num_layers': [2, 4],
         }
+
 
 def train_one_fold(args, fold, hyperparams, y_train, modis, era, cv_split, device, patience=10):
     targets = ['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NEE_VUT_USTAR50']
@@ -191,7 +199,7 @@ def train_one_fold(args, fold, hyperparams, y_train, modis, era, cv_split, devic
     best_model_state = None
     no_improve_count = 0
     
-    for epoch in range(1, args.num_epochs + 1):
+    for epoch in tqdm(range(1, args.num_epochs + 1)):
         model.train()
         for x, x_static, y_batch, qc, igbp_w, koppen_w in train_loader:
             x = x.to(device)
@@ -303,19 +311,19 @@ def train_one_fold(args, fold, hyperparams, y_train, modis, era, cv_split, devic
 def main():
     args = parse_args()
     set_seed(args.seed)
-    
+
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
     print(f"Model: {args.model}")
     print(f"Split type: {args.split_type}")
-    
-    # Create output directory
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = os.path.join(args.output_dir, f"{args.model}_{args.split_type}_{timestamp}")
+
+    # Create output directory (deterministic, no timestamp)
+    output_path = os.path.join(args.output_dir, f"{args.model}_{args.split_type}")
     os.makedirs(output_path, exist_ok=True)
+    results_path = os.path.join(output_path, 'gridsearch_results.csv')
     
     # Load data
-    print("\nLoading data...")
+    print(f"\nLoading data...")
     targets = ['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NEE_VUT_USTAR50']
     y = carbonbench.load_targets(targets, qc=True)
     y_train, y_test = carbonbench.split_targets(
@@ -334,22 +342,39 @@ def main():
     # Get parameter grid
     param_grid = get_param_grid(args.model)
     print(f"\nParameter grid: {param_grid}")
-    
+
     # Generate all combinations
     param_names = list(param_grid.keys())
     param_values = list(param_grid.values())
     all_combinations = list(itertools.product(*param_values))
-    
+
     print(f"Total combinations: {len(all_combinations)}")
     print(f"Total runs: {len(all_combinations)} x 5 folds = {len(all_combinations) * 5}")
-    
+
+    # Load existing results if available
+    if os.path.exists(results_path):
+        existing_results = pd.read_csv(results_path)
+        print(f"{Colors.GREEN}Found existing results with {len(existing_results)} entries{Colors.RESET}")
+        remaining = len(all_combinations) - len(existing_results)
+        print(f"Remaining runs: {remaining}")
+    else:
+        existing_results = pd.DataFrame()
+        print(f"No existing results found, starting fresh")
+
     # Grid search
-    all_results = []
-    
     for i, combo in enumerate(tqdm(all_combinations, desc="Grid Search")):
         hyperparams = dict(zip(param_names, combo))
         print(f"\n[{i+1}/{len(all_combinations)}] Testing: {hyperparams}")
-        
+
+        # Check if this hyperparameter combination already exists
+        if not existing_results.empty:
+            match = existing_results
+            for param_name, param_value in hyperparams.items():
+                match = match[match[param_name] == param_value]
+            if not match.empty:
+                print(f"{Colors.GREEN}Skipping - already completed{Colors.RESET}")
+                continue
+
         fold_r2_scores = []
         fold_rmse_scores = []
         fold_val_losses = []
@@ -364,9 +389,11 @@ def main():
                 fold_r2_scores.append(r2)
                 fold_rmse_scores.append(rmse)
                 fold_val_losses.append(val_loss)
-                print(f"(stopped at epoch {stopped_epoch}) R2={r2:.4f}, RMSE={rmse:.4f}")
+                print(f"{Colors.GREEN}(stopped at epoch {stopped_epoch}) R2={r2:.4f}, RMSE={rmse:.4f}{Colors.RESET}")
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"{Colors.RED}Error in fold {fold}: {e}{Colors.RESET}")
+                print(f"{Colors.RED}Full traceback:{Colors.RESET}")
+                traceback.print_exc()
                 fold_r2_scores.append(np.nan)
                 fold_rmse_scores.append(np.nan)
                 fold_val_losses.append(np.nan)
@@ -378,44 +405,55 @@ def main():
             'cv_rmse_mean': np.nanmean(fold_rmse_scores),
             'cv_rmse_std': np.nanstd(fold_rmse_scores),
             'cv_val_loss_mean': np.nanmean(fold_val_losses),
-            'fold_r2_scores': fold_r2_scores,
+            'fold_r2_scores': str(fold_r2_scores),  # Convert to string for CSV
         }
-        all_results.append(result)
-        
+
         print(f"  CV R2: {result['cv_r2_mean']:.4f} +/- {result['cv_r2_std']:.4f}")
+
+        # Append to CSV immediately
+        result_df = pd.DataFrame([result])
+        if os.path.exists(results_path):
+            result_df.to_csv(results_path, mode='a', header=False, index=False)
+        else:
+            result_df.to_csv(results_path, mode='w', header=True, index=False)
+        print(f"  Saved to {results_path}")
     
-    # Save results
-    results_df = pd.DataFrame(all_results)
-    results_df = results_df.sort_values('cv_r2_mean', ascending=False)
-    results_path = os.path.join(output_path, 'gridsearch_results.csv')
-    results_df.to_csv(results_path, index=False)
+    # Load and sort all results
+    if os.path.exists(results_path):
+        results_df = pd.read_csv(results_path)
+        results_df = results_df.sort_values('cv_r2_mean', ascending=False)
+        results_df.to_csv(results_path, index=False)  # Resave sorted
+
+        # Find best parameters
+        best_idx = results_df['cv_r2_mean'].idxmax()
+        best_params = results_df.loc[best_idx].to_dict()
+
+        best_params_clean = {k: v for k, v in best_params.items()
+                             if k in param_names}
+
+        best_params_path = os.path.join(output_path, 'best_params.json')
+        with open(best_params_path, 'w') as f:
+            json.dump({
+                'best_params': best_params_clean,
+                'cv_r2_mean': float(best_params['cv_r2_mean']),
+                'cv_r2_std': float(best_params['cv_r2_std']),
+                'cv_rmse_mean': float(best_params['cv_rmse_mean']),
+                'model': args.model,
+                'split_type': args.split_type,
+            }, f, indent=2)
+    else:
+        print(f"{Colors.RED}No results found!{Colors.RESET}")
+        return
     
-    # Find best parameters
-    best_idx = results_df['cv_r2_mean'].idxmax()
-    best_params = results_df.loc[best_idx].to_dict()
-    
-    best_params_clean = {k: v for k, v in best_params.items() 
-                         if k in param_names}
-    
-    best_params_path = os.path.join(output_path, 'best_params.json')
-    with open(best_params_path, 'w') as f:
-        json.dump({
-            'best_params': best_params_clean,
-            'cv_r2_mean': float(best_params['cv_r2_mean']),
-            'cv_r2_std': float(best_params['cv_r2_std']),
-            'cv_rmse_mean': float(best_params['cv_rmse_mean']),
-            'model': args.model,
-            'split_type': args.split_type,
-        }, f, indent=2)
-    
-    print("Grid Search Complete")
+    print(f"\n{Colors.GREEN}Grid Search Complete{Colors.RESET}")
+    print(f"Total completed runs: {len(results_df)}")
     print(f"Results saved to: {results_path}")
     print(f"Best params saved to: {best_params_path}")
     print(f"\nBest parameters:")
     for k, v in best_params_clean.items():
         print(f"  {k}: {v}")
-    print(f"\nBest CV R2: {best_params['cv_r2_mean']:.4f} +/- {best_params['cv_r2_std']:.4f}")
-    print(f"Best CV RMSE: {best_params['cv_rmse_mean']:.4f}")
+    print(f"\n{Colors.GREEN}Best CV R2: {best_params['cv_r2_mean']:.4f} +/- {best_params['cv_r2_std']:.4f}{Colors.RESET}")
+    print(f"{Colors.GREEN}Best CV RMSE: {best_params['cv_rmse_mean']:.4f}{Colors.RESET}")
 
 
 if __name__ == '__main__':

@@ -23,7 +23,7 @@ def train_tamrl(forward_model, inverse_model, train_loader_tamrl, val_loader_tam
             latent_repr, _,_,_ = inverse_model(x=batch_input.float())
 
             batch_static_input = latent_repr[:x.shape[0]].unsqueeze(1).repeat(1, window, 1) # GET BATCH DATA FOR FORWARD MODEL
-            pred = forward_model(x_dynamic=x.float().to(device), x_static=batch_static_input.float().to(device)).squeeze()
+            pred = forward_model(x_dynamic=x.float().to(device), x_static=batch_static_input.float().to(device))
 
             if criterion.__class__.__name__=='CustomLoss':
                 error = criterion(pred[:,-stride:, :], y[:,-stride:,:3], qc, igbp_w, koppen_w)
@@ -51,7 +51,7 @@ def train_tamrl(forward_model, inverse_model, train_loader_tamrl, val_loader_tam
                     latent_repr, _,_,_ = inverse_model(x=batch_input.float())
 
                     batch_static_input = latent_repr[:x.shape[0]].unsqueeze(1).repeat(1, window, 1) # GET BATCH DATA FOR FORWARD MODEL
-                    pred = forward_model(x_dynamic=x.float().to(device), x_static=batch_static_input.float().to(device)).squeeze()
+                    pred = forward_model(x_dynamic=x.float().to(device), x_static=batch_static_input.float().to(device))
 
                     val_preds.append(pred.detach().cpu())
                     val_true.append(y.detach().cpu())
