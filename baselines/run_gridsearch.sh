@@ -3,8 +3,8 @@
 #SBATCH --job-name=CB_grid
 #SBATCH --output=logs/gridsearch_%j.txt
 #SBATCH --error=logs/gridsearch_err_%j.txt
-#SBATCH --time=56:00:00
-#SBATCH --partition=msigpu #kgml03 #
+#SBATCH --time=24:00:00
+#SBATCH --partition=msigpu #kgml03 #kgml02
 #SBATCH --gres=gpu:a100:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G

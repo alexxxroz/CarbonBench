@@ -30,7 +30,41 @@ class lstm(torch.nn.Module):
 		out = self.out(x_encoder)
 		out = out.view(batch, window, self.output_channels)
 		return out
-    
+
+class ctlstm_decoder(torch.nn.Module):
+    def __init__(self, input_dynamic_channels, input_static_channels, hidden_dim, output_channels, dropout, layers=1):
+        super().__init__()
+
+        self.input_dynamic_channels = input_dynamic_channels
+        self.input_static_channels = input_static_channels
+        self.hidden_dim = hidden_dim
+        self.output_channels = output_channels
+        self.layers = layers
+        
+        self.dynamic_encoder = torch.nn.Linear(in_features=self.input_dynamic_channels, out_features=self.hidden_dim // 2)
+        self.static_encoder = torch.nn.Linear(in_features=self.input_static_channels, out_features=self.hidden_dim // 2)
+        self.encoder = torch.nn.LSTM(input_size=self.hidden_dim, hidden_size=self.hidden_dim, num_layers=self.layers,batch_first=True)
+        self.out = torch.nn.Linear(in_features=self.hidden_dim, out_features=self.output_channels)
+        self.dropout = torch.nn.Dropout(p=dropout)
+        self.relu = torch.nn.ReLU()
+        
+        for m in self.modules():
+            if isinstance(m, torch.nn.Conv2d) or isinstance(m, torch.nn.Linear):
+                torch.nn.init.xavier_uniform_(m.weight)
+
+    def forward(self, x_dynamic, x_static):
+        batch, window, _ = x_dynamic.shape
+        
+        x_dynamic_encoder = self.relu(self.dynamic_encoder(x_dynamic))
+        x_static_encoder = self.relu(self.static_encoder(x_static))
+        
+        x = torch.cat((x_dynamic_encoder, x_static_encoder), dim=-1)
+        x_encoder, _ = self.encoder(x)
+        x_encoder = self.dropout(x_encoder)
+        out = self.out(x_encoder)
+        out = out.view(batch, window, self.output_channels)
+        return out    
+
 class ctlstm(torch.nn.Module):
     def __init__(self, input_dynamic_channels, input_static_channels, hidden_dim, output_channels, dropout, layers=1):
         super().__init__()

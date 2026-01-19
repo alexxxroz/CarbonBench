@@ -161,9 +161,7 @@ def train_one_fold(args, fold, hyperparams, y_train, modis, era, cv_split, devic
         'dropout': hyperparams['dropout'],
     }
     
-    if args.model in ['lstm', 'gru']:
-        model_kwargs['layers'] = hyperparams['layers']
-    else:
+    if args.model not in ['lstm', 'gru']:
         model_kwargs['input_static_channels'] = input_static_channels
     
     if 'transformer' in args.model:
@@ -267,7 +265,7 @@ def train_one_fold(args, fold, hyperparams, y_train, modis, era, cv_split, devic
         inverse_model = carbonbench.ae_tamrl(input_channels=model_kwargs['input_dynamic_channels']+model_kwargs['input_static_channels'], 
                                              code_dim=model_kwargs['latent_dim'], hidden_dim=model_kwargs['latent_dim'], output_channels=model_kwargs['latent_dim']).to(device)
         forward_model = carbonbench.tamlstm(model_kwargs['input_dynamic_channels'], model_kwargs['latent_dim'], model_kwargs['hidden_dim'], 
-                                            model_kwargs['output_channels'], model_kwargs['dropout']).to(device)
+                                            model_kwargs['output_channels'], model_kwargs['dropout'], model_kwargs['layers']).to(device)
 
         encoder_weights = {k.replace('encoder.', ''): v for k, v in best_model.items() if k.startswith('encoder.')}
         forward_model.encoder.load_state_dict(encoder_weights)
