@@ -1,0 +1,13 @@
+{
+  "best_params": {
+    "hidden_dim": 256,
+    "dropout": 0.2,
+    "lr": 0.0005,
+    "layers": 2
+  },
+  "cv_r2_mean": 0.3622161495235759,
+  "cv_r2_std": 0.0158656771668888,
+  "cv_rmse_mean": 1.786789249026167,
+  "model": "gru",
+  "split_type": "Koppen"
+}

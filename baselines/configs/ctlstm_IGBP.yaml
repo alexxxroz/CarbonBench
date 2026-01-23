@@ -1,0 +1,10 @@
+model: ctlstm
+split_type: IGBP
+best_params:
+  hidden_dim: 128
+  dropout: 0.2
+  lr: 0.0005
+  layers: 1
+cv_r2_mean: 0.4010221871223879
+cv_r2_std: 0.0169198929545687
+cv_rmse_mean: 1.7130131855890902

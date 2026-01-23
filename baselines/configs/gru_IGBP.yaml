@@ -1,0 +1,10 @@
+model: gru
+split_type: IGBP
+best_params:
+  hidden_dim: 128
+  dropout: 0.3
+  lr: 0.0005
+  layers: 1
+cv_r2_mean: 0.3623267331927583
+cv_r2_std: 0.0193281327720065
+cv_rmse_mean: 1.7825708688579158

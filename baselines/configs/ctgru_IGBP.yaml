@@ -1,0 +1,10 @@
+model: ctgru
+split_type: IGBP
+best_params:
+  hidden_dim: 128
+  dropout: 0.3
+  lr: 0.0005
+  layers: 1
+cv_r2_mean: 0.3989203419210186
+cv_r2_std: 0.0227238119585364
+cv_rmse_mean: 1.7088200449765985

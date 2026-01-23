@@ -1,0 +1,13 @@
+{
+  "best_params": {
+    "hidden_dim": 256,
+    "dropout": 0.3,
+    "lr": 0.0005,
+    "layers": 2
+  },
+  "cv_r2_mean": 0.3983575499243326,
+  "cv_r2_std": 0.0126772122665908,
+  "cv_rmse_mean": 1.731969173144392,
+  "model": "ctlstm",
+  "split_type": "Koppen"
+}

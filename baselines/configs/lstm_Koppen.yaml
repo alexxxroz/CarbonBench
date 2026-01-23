@@ -1,0 +1,10 @@
+model: lstm
+split_type: Koppen
+best_params:
+  hidden_dim: 128
+  dropout: 0.3
+  lr: 0.001
+  layers: 1
+cv_r2_mean: 0.3687852674207104
+cv_r2_std: 0.0198474884026624
+cv_rmse_mean: 1.7752615946310073

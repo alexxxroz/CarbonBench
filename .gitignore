@@ -9,6 +9,7 @@ data/
 scripts/getERA5Land_extra.py
 scripts/getMOD09GA_extra.py
 baselines/outputs
+baselines/logs
 examples/zero-shot_experiments.ipynb
 # Byte-compiled / optimized / DLL files
 __pycache__/

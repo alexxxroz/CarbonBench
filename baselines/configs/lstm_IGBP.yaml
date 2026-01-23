@@ -1,0 +1,10 @@
+model: lstm
+split_type: IGBP
+best_params:
+  hidden_dim: 256
+  dropout: 0.3
+  lr: 0.001
+  layers: 1
+cv_r2_mean: 0.3697722212262399
+cv_r2_std: 0.0212122482378786
+cv_rmse_mean: 1.7828223636794047

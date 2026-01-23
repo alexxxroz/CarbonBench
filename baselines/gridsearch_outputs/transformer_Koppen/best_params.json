@@ -1,0 +1,14 @@
+{
+  "best_params": {
+    "hidden_dim": 128,
+    "dropout": 0.2,
+    "lr": 0.0005,
+    "nhead": 4,
+    "num_layers": 2
+  },
+  "cv_r2_mean": 0.3830793588717979,
+  "cv_r2_std": 0.0120040609922193,
+  "cv_rmse_mean": 1.7569055073797653,
+  "model": "transformer",
+  "split_type": "Koppen"
+}

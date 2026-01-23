@@ -1,0 +1,10 @@
+model: ctgru
+split_type: Koppen
+best_params:
+  hidden_dim: 128
+  dropout: 0.3
+  lr: 0.0005
+  layers: 1
+cv_r2_mean: 0.3947002321756762
+cv_r2_std: 0.0159890755307692
+cv_rmse_mean: 1.7091265712309451
