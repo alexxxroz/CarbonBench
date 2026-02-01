@@ -172,8 +172,8 @@ def main():
         model_kwargs['seq_len'] = window_size
         if 'patch' in args.model:
             model_kwargs['pred_len'] = stride
-            model_kwargs['patch_len'] = 10
-            model_kwargs['stride'] = 5
+            model_kwargs['patch_len'] = 4
+            model_kwargs['stride'] = 4
     else:
         model_kwargs['layers'] = best_params['layers']
     

@@ -74,8 +74,10 @@ class ctlstm(torch.nn.Module):
         self.hidden_dim = hidden_dim
         self.output_channels = output_channels
         self.layers = layers
-
-        self.encoder = torch.nn.LSTM(input_size=self.input_dynamic_channels + self.input_static_channels, hidden_size=self.hidden_dim, num_layers=self.layers, batch_first=True)
+        
+        self.dynamic_encoder = torch.nn.Linear(in_features=self.input_dynamic_channels, out_features=self.hidden_dim // 2)
+        self.static_encoder = torch.nn.Linear(in_features=self.input_static_channels, out_features=self.hidden_dim // 2)
+        self.encoder = torch.nn.LSTM(input_size=self.hidden_dim, hidden_size=self.hidden_dim, num_layers=self.layers, batch_first=True)
         self.out = torch.nn.Linear(in_features=self.hidden_dim, out_features=self.output_channels)
         self.dropout = torch.nn.Dropout(p=dropout)
 
@@ -85,7 +87,10 @@ class ctlstm(torch.nn.Module):
 
     def forward(self, x_dynamic, x_static):
         batch, window, _ = x_dynamic.shape
-
+        
+        x_dynamic = self.dynamic_encoder(x_dynamic)
+        x_static = self.static_encoder(x_static)
+        
         x = torch.cat((x_dynamic, x_static), dim=-1)
         x_encoder, _ = self.encoder(x)
         x_encoder = self.dropout(x_encoder)
@@ -125,17 +130,22 @@ class ctgru(nn.Module):
         self.output_channels = output_channels
         self.layers = layers
         
-        self.gru = torch.nn.GRU(self.input_dynamic_channels + self.input_static_channels, self.hidden_dim, self.layers, batch_first=True, dropout=dropout)
+        self.dynamic_encoder = torch.nn.Linear(in_features=self.input_dynamic_channels, out_features=self.hidden_dim // 2)
+        self.static_encoder = torch.nn.Linear(in_features=self.input_static_channels, out_features=self.hidden_dim // 2)
+        self.gru = torch.nn.GRU(self.hidden_dim, self.hidden_dim, self.layers, batch_first=True, dropout=dropout)
         self.fc = torch.nn.Linear(self.hidden_dim, self.output_channels)
         self.dropout = torch.nn.Dropout(dropout)
         
     def forward(self, x_dynamic, x_static):
         batch, window, _ = x_dynamic.shape
-
+        
+        x_dynamic = self.dynamic_encoder(x_dynamic)
+        x_static = self.static_encoder(x_static)
+        
         x = torch.cat((x_dynamic, x_static), dim=-1)
-        x_encoder, _ = self.gru(x)
+        x_encoder, _ = self.encoder(x)
         x_encoder = self.dropout(x_encoder)
-        out = self.fc(x_encoder)
+        out = self.out(x_encoder)
         out = out.view(batch, window, self.output_channels)
         return out    
 
