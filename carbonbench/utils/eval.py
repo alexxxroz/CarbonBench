@@ -57,14 +57,7 @@ def _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_
         preds = y_scaler.inverse_transform(preds)#.reshape(-1, preds.shape[2]))
         y_site = y_scaler.inverse_transform(true)#.reshape(-1, true.shape[2]))
         
-        site_meta = test[test.site == site].iloc[0]
-        for idx, target in enumerate(targets):
-            res[target]['site'].append(site)
-            res[target]['IGBP'].append(site_meta.IGBP)
-            res[target]['Koppen'].append(site_meta.Koppen)
-            res[target]['R2'].append(np.clip(r2_score(y_site[:, idx], preds[:, idx]), 0, 1))
-            res[target]['RMSE'].append(root_mean_squared_error(y_site[:, idx], preds[:, idx]))
-            res[target]['MAPE'].append(mape(np.mean(y_site[:, idx]), y_site[:, idx], preds[:, idx]))
+        res = append_results(res, test, site, y_site, preds, targets)
     
     print("\t\t\tR2\tRMSE\tMAPE")
     for target in targets:
@@ -73,6 +66,16 @@ def _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_
         print(f"{target}:\t{r['R2'].mean():.2f}\t{r['RMSE'].mean():.2f}\t{r['MAPE'].mean():.2f}")
     return res
 
+def append_results(res, test, site, y_site, preds, targets):
+    site_meta = test[test.site == site].iloc[0]
+    for idx, target in enumerate(targets):
+        res[target]['site'].append(site)
+        res[target]['IGBP'].append(site_meta.IGBP)
+        res[target]['Koppen'].append(site_meta.Koppen)
+        res[target]['R2'].append(np.clip(r2_score(y_site[:, idx], preds[:, idx]), 0, 1))
+        res[target]['RMSE'].append(root_mean_squared_error(y_site[:, idx], preds[:, idx]))
+        res[target]['MAPE'].append(mape(np.mean(y_site[:, idx]), y_site[:, idx], preds[:, idx]))
+    return res
 
 def eval_nn_model(test_dataset, test, targets, model, architecture, device, y_scaler, batch_size=32):
     def predict_fn(loader, site):

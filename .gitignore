@@ -11,6 +11,7 @@ scripts/getMOD09GA_extra.py
 baselines/outputs
 baselines/logs
 examples/zero-shot_experiments.ipynb
+examples/few-shot_experiments.ipynb
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -8,17 +8,14 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --array=0-9 #-99
+#SBATCH --array=0-39
 
-#export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 source ~/.bashrc
-#conda activate cover_env
 conda activate ct-lstm
 
-MODELS=("ctlstm") # "ctlstm" "gru" "ctgru" "transformer")
-SPLITS=("IGBP") # "Koppen")
+MODELS=("ctlstm" "transformer") #"lstm" "gru" "ctgru"
+SPLITS=("IGBP" "Koppen")
 
-# suitable seeds?
 SEEDS=(27 28 29 30 31 32 33 34 35 36)
 
 NUM_MODELS=${#MODELS[@]}
@@ -41,7 +38,7 @@ echo "Model: $MODEL"
 echo "Split: $SPLIT"
 echo "Seed: $SEED"
 
-python train_single.py \
+python train_single_zero.py \
     --model $MODEL \
     --split_type $SPLIT \
     --seed $SEED \

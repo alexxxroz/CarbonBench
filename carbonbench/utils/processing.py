@@ -20,6 +20,8 @@ class SlidingWindowDataset(Dataset):
         
         IGBP_CLASSES = ["CRO","CSH","CVM","DBF","DNF","EBF","ENF","GRA","MF","OSH","SAV","SNO","URB","WAT","WET","WSA"]
         KOPPEN_CLASSES = ["A","B","C","D","E"]
+        KOPPEN_SHORT_CLASSES = ["Af", "Am", "Aw", "BWh", "BWk", "BSh", "BSk", "Cfa", "Cwa", "Csa", "Csb", "Csc", "Cwb", "Cwc", 
+                                "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF"]
         self.igbp2id = {c:i for i,c in enumerate(IGBP_CLASSES)}
         self.koppen2id = {c:i for i,c in enumerate(KOPPEN_CLASSES)}
         
@@ -29,7 +31,16 @@ class SlidingWindowDataset(Dataset):
         if encoders is None:
             self.encoders = {}
             for col in self.cat_features:
-                enc = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+                if col == 'IGBP':
+                    categories = [IGBP_CLASSES]
+                elif col == 'Koppen':
+                    categories = [KOPPEN_CLASSES]
+                elif col == 'Koppen_short':
+                    categories = [KOPPEN_SHORT_CLASSES]
+                else:
+                    categories = 'auto'
+
+                enc = OneHotEncoder(sparse_output=False, handle_unknown='ignore', categories=categories)
                 enc.fit(df[[col]])
                 self.encoders[col] = enc
         else:
