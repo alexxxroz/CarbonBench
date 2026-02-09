@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.metrics import root_mean_squared_error, r2_score
+from sklearn.metrics import root_mean_squared_error, r2_score, mean_absolute_error
 from sklearn.preprocessing import StandardScaler
 
 import torch
@@ -15,14 +15,26 @@ import seaborn as sns
 
 from .processing import SlidingWindowDataset, SlidingWindowDatasetTAMRL
 
-def mape(mean_flux: float, true: np.ndarray, pred: np.ndarray):
+def normalized_mae(mean_flux: float, true: np.ndarray, pred: np.ndarray):
     # computes absolute error normalized by site mean flux
-    mape = np.abs(pred - true) / (np.abs(mean_flux) + 1e-9)
-    return np.mean(mape)
+    nmae = np.abs(pred - true) / (np.abs(mean_flux) + 1e-9)
+    return np.mean(nmae)
+
+def relative_absolute_error(y_true, y_pred):
+    mae_model = mean_absolute_error(y_true, y_pred)
+    y_naive = np.mean(y_true) * np.ones_like(y_true)
+    mae_naive = mean_absolute_error(y_true, y_naive)
+    
+    if mae_naive == 0:
+        return np.inf  
+    rae = mae_model / mae_naive
+    return rae
 
 def eval_tree_model(X_test: pd.DataFrame, y_test: pd.DataFrame, targets: list, model: Any, y_scaler: StandardScaler, method: str='xgb'):
     # Evaluation of a tree-based model (XGBoost is default)
-    res = {target: {'site': [], 'IGBP': [], 'Koppen': [], 'R2': [], 'RMSE': [], 'MAPE': []} for target in targets}
+    res = {target: {'site': [], 'IGBP': [], 'Koppen': [], 
+                        'R2': [], 'RMSE': [], 'nMAE': [],
+                         'RAE': [],} for target in targets}
     for site in X_test.site.unique():
         X_site, y_site = X_test[X_test.site==site].drop('site', axis=1), y_test[X_test.site==site]
         if method=='xgb':
@@ -33,17 +45,21 @@ def eval_tree_model(X_test: pd.DataFrame, y_test: pd.DataFrame, targets: list, m
             res[target]['site'].append(site)
             res[target]['IGBP'].append(X_test[X_test.site==site].IGBP.values[0])
             res[target]['Koppen'].append(X_test[X_test.site==site].Koppen.values[0])
-            res[target]['R2'].append(np.clip(r2_score(y_site[:, idx], preds[:, idx]), 0, 1))
+            res[target]['R2'].append(r2_score(y_site[:, idx], preds[:, idx]))
             res[target]['RMSE'].append(root_mean_squared_error(y_site[:, idx], preds[:, idx]))
-            res[target]['MAPE'].append(mape(np.mean(y_site[:, idx]), y_site[:, idx], preds[:, idx]))
-    print("\t\t\tR2\tRMSE\tMAPE")
+            res[target]['RAE'].append(relative_absolute_error(y_site[:, idx], preds[:, idx]))
+            res[target]['nMAE'].append(normalized_mae(np.mean(y_site[:, idx]), y_site[:, idx], preds[:, idx]))
+    print("\t\t\tR2\tRMSE\tRAE\tnMAE")
     for target in targets:
         res[target] = pd.DataFrame(res[target])
-        print(f"{target}:\t{round(np.mean(res[target]['R2']),2)}\t{round(np.mean(res[target]['RMSE']),2)}\t{round(np.mean(res[target]['MAPE']),2)}") 
+        r = res[target]
+        print(f"{target}:\t{r['R2'].mean():.3f}\t{r['RMSE'].mean():.3f}\t{r['RAE'].mean():.3f}\t{r['nMAE'].mean():.3f}")
     return res
 
 def _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_size=32):
-    res = {target: {'site': [], 'IGBP': [], 'Koppen': [], 'R2': [], 'RMSE': [], 'MAPE': []} for target in targets}
+    res = {target: {'site': [], 'IGBP': [], 'Koppen': [], 
+                        'R2': [], 'RMSE': [], 'nMAE': [],
+                         'RAE': [],} for target in targets}
     
     for site in test_dataset.get_sites():
         site_indices = test_dataset.get_site_indices(site)
@@ -59,11 +75,11 @@ def _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_
         
         res = append_results(res, test, site, y_site, preds, targets)
     
-    print("\t\t\tR2\tRMSE\tMAPE")
+    print("\t\t\tR2\tRMSE\tRAE\tnMAE")
     for target in targets:
         res[target] = pd.DataFrame(res[target])
         r = res[target]
-        print(f"{target}:\t{r['R2'].mean():.2f}\t{r['RMSE'].mean():.2f}\t{r['MAPE'].mean():.2f}")
+        print(f"{target}:\t{r['R2'].mean():.3f}\t{r['RMSE'].mean():.3f}\t{r['RAE'].mean():.3f}\t{r['nMAE'].mean():.3f}")
     return res
 
 def append_results(res, test, site, y_site, preds, targets):
@@ -72,9 +88,10 @@ def append_results(res, test, site, y_site, preds, targets):
         res[target]['site'].append(site)
         res[target]['IGBP'].append(site_meta.IGBP)
         res[target]['Koppen'].append(site_meta.Koppen)
-        res[target]['R2'].append(np.clip(r2_score(y_site[:, idx], preds[:, idx]), 0, 1))
+        res[target]['R2'].append(r2_score(y_site[:, idx], preds[:, idx]))
         res[target]['RMSE'].append(root_mean_squared_error(y_site[:, idx], preds[:, idx]))
-        res[target]['MAPE'].append(mape(np.mean(y_site[:, idx]), y_site[:, idx], preds[:, idx]))
+        res[target]['RAE'].append(relative_absolute_error(y_site[:, idx], preds[:, idx]))
+        res[target]['nMAE'].append(normalized_mae(np.mean(y_site[:, idx]), y_site[:, idx], preds[:, idx]))
     return res
 
 def eval_nn_model(test_dataset, test, targets, model, architecture, device, y_scaler, batch_size=32):
@@ -172,7 +189,7 @@ def plot_bars(results: dict, metrics: list, targets: list, save_path: str=""):
             ax.set_xticks(x_pos)
             ax.set_xticklabels(plot_df['model'], rotation=0)
             
-            if metric in ['RMSE', 'MAPE']: # find best model
+            if metric in ['RMSE', 'nMAE']: # find best model
                 best_idx = plot_df.groupby('model')['mean'].mean().idxmin()
             else:
                 best_idx = plot_df.groupby('model')['mean'].mean().idxmax()

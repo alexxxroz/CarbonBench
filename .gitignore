@@ -8,10 +8,11 @@ data/
 # Download more recent data
 scripts/getERA5Land_extra.py
 scripts/getMOD09GA_extra.py
-baselines/outputs
+baselines/models
 baselines/logs
 examples/zero-shot_experiments.ipynb
 examples/few-shot_experiments.ipynb
+few_shot/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

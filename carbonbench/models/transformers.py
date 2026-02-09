@@ -61,8 +61,9 @@ class patch_transformer(nn.Module):
         if self.num_patches <= 0:
             raise ValueError("num_patches computed <= 0; check seq_len/patch_len/stride")
 
-        # patch embedding per channel (patch_len -> hidden_dim)
-        self.patch_embedding = nn.Linear(self.patch_len, self.hidden_dim)
+        # modified for multi-channel patching
+        # self.patch_embedding = nn.Linear(self.patch_len, self.hidden_dim)
+        self.patch_embedding = nn.Linear(self.in_dyn * self.patch_len, self.hidden_dim)
 
         # learnable positional embedding (1, num_patches, hidden_dim)
         self.pos_embed = nn.Parameter(torch.randn(1, self.num_patches, self.hidden_dim) * 0.02)
@@ -83,9 +84,9 @@ class patch_transformer(nn.Module):
             nn.Dropout(dropout),
         )
 
-        # x_enc: (B, C, num_patches, hidden_dim)
-        # pool patches -> (B, C, hidden_dim) then flatten -> (B, C*hidden_dim)
-        head_in = (self.in_dyn * self.hidden_dim) + self.hidden_dim
+        # modified head input calculation
+        # head_in = (self.in_dyn * self.hidden_dim) + self.hidden_dim
+        head_in = 2 * self.hidden_dim
 
         self.head = nn.Sequential(
             nn.LayerNorm(head_in),
@@ -116,26 +117,35 @@ class patch_transformer(nn.Module):
         # unfold into patches: (B, C, num_patches, patch_len)
         x_p = x.unfold(dimension=-1, size=self.patch_len, step=self.stride)
 
-        # patch embedding: (B, C, num_patches, hidden_dim)
+        # modified to flatten all channels together for multi-channel patching
+        # x_e = self.patch_embedding(x_p)
+        # x_e = x_e + self.pos_embed.unsqueeze(1)  # (1,1,num_patches,hidden_dim) broadcast
+        # x_in = x_e.reshape(B * C, self.num_patches, self.hidden_dim)
+        # x_enc = self.encoder(x_in)  # (B*C, num_patches, hidden_dim)
+        # x_enc = x_enc.reshape(B, C, self.num_patches, self.hidden_dim)
+        # x_chan = x_enc.mean(dim=2)
+        # x_dyn_flat = x_chan.flatten(start_dim=1)
+        
+        # flatten channels into patch combining all channels at once
+        x_p = x_p.permute(0, 2, 1, 3)  # (B, num_patches, C, patch_len)
+        x_p = x_p.reshape(x_p.size(0), x_p.size(1), -1)  # (B, num_patches, C * patch_len)
+
+        # patch embedding handling multi-channel cube
         x_e = self.patch_embedding(x_p)
-        x_e = x_e + self.pos_embed.unsqueeze(1)  # (1,1,num_patches,hidden_dim) broadcast
+        x_e = x_e + self.pos_embed  # (1, num_patches, hidden_dim) broadcast
 
-        # channel-independent encoding: reshape to (B*C, num_patches, hidden_dim)
-        x_in = x_e.reshape(B * C, self.num_patches, self.hidden_dim)
-        x_enc = self.encoder(x_in)  # (B*C, num_patches, hidden_dim)
-        x_enc = x_enc.reshape(B, C, self.num_patches, self.hidden_dim)
+        # encode using transformer on all patches together
+        x_enc = self.encoder(x_e)
 
-        # pool over patches -> (B, C, hidden_dim)
-        x_chan = x_enc.mean(dim=2)
+        # pool over patches to get feature representation
+        x_out = x_enc.mean(dim=1)
 
-        # flatten channels -> (B, C*hidden_dim)
-        x_dyn_flat = x_chan.flatten(start_dim=1)
-
-        # static -> (B, hidden_dim)
+        # static features processing
         x_stat_emb = self.static_encoder(x_static[:, 0, :])
         
-        # head
-        z = torch.cat([x_dyn_flat, x_stat_emb], dim=1)  # (B, head_in)
-        out = self.head(z)                              # (B, pred_len*out_ch)
+        # combine dynamic and static features for final prediction
+        # z = torch.cat([x_dyn_flat, x_stat_emb], dim=1)  # (B, head_in)
+        z = torch.cat([x_out, x_stat_emb], dim=1)  # (B, 2*hidden_dim)
+        out = self.head(z)  # (B, pred_len*out_ch)
         out = out.view(B, self.pred_len, self.out_ch)
         return out

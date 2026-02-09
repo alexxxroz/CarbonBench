@@ -132,8 +132,8 @@ class ctgru(nn.Module):
         
         self.dynamic_encoder = torch.nn.Linear(in_features=self.input_dynamic_channels, out_features=self.hidden_dim // 2)
         self.static_encoder = torch.nn.Linear(in_features=self.input_static_channels, out_features=self.hidden_dim // 2)
-        self.gru = torch.nn.GRU(self.hidden_dim, self.hidden_dim, self.layers, batch_first=True, dropout=dropout)
-        self.fc = torch.nn.Linear(self.hidden_dim, self.output_channels)
+        self.encoder = torch.nn.GRU(self.hidden_dim, self.hidden_dim, self.layers, batch_first=True, dropout=dropout)
+        self.out = torch.nn.Linear(self.hidden_dim, self.output_channels)
         self.dropout = torch.nn.Dropout(dropout)
         
     def forward(self, x_dynamic, x_static):

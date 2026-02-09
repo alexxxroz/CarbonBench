@@ -1,0 +1,8 @@
+model: mlp
+split_type: Koppen
+best_params:
+  hidden_dim: 256
+  dropout: 0.3
+  lr: 0.0005
+cv_r2_mean: 0.5085140188535054
+cv_r2_std: 0.0238400461416074

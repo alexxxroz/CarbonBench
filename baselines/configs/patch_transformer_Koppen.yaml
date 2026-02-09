@@ -1,0 +1,11 @@
+model: patch_transformer
+split_type: Koppen
+best_params:
+  hidden_dim: 128
+  dropout: 0.2
+  lr: 0.0005
+  nhead: 4
+  num_layers: 2
+cv_r2_mean: 0.3372771246833072
+cv_r2_std: 0.0196339531878076
+cv_rmse_mean: 1.8221416585589467
