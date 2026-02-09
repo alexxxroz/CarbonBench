@@ -1,5 +1,9 @@
+'''
+This module contains evaluation functions estimating model performance on site-level(!).
+'''
+
 import os
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -15,12 +19,24 @@ import seaborn as sns
 
 from .processing import SlidingWindowDataset, SlidingWindowDatasetTAMRL
 
-def normalized_mae(mean_flux: float, true: np.ndarray, pred: np.ndarray):
-    # computes absolute error normalized by site mean flux
+def normalized_mae(
+        mean_flux: float, 
+        true: np.ndarray, 
+        pred: np.ndarray
+    ):
+    '''
+    Computes absolute error normalized by site mean flux.
+    '''
     nmae = np.abs(pred - true) / (np.abs(mean_flux) + 1e-9)
     return np.mean(nmae)
 
-def relative_absolute_error(y_true, y_pred):
+def relative_absolute_error(
+        y_true: np.ndarray, 
+        y_pred: np.ndarray,
+    ):
+    '''
+    Computes relative absolute error (RAE) -- L1 version of R2 -- using mean value as a normalization factor.
+    '''
     mae_model = mean_absolute_error(y_true, y_pred)
     y_naive = np.mean(y_true) * np.ones_like(y_true)
     mae_naive = mean_absolute_error(y_true, y_naive)
@@ -30,8 +46,17 @@ def relative_absolute_error(y_true, y_pred):
     rae = mae_model / mae_naive
     return rae
 
-def eval_tree_model(X_test: pd.DataFrame, y_test: pd.DataFrame, targets: list, model: Any, y_scaler: StandardScaler, method: str='xgb'):
-    # Evaluation of a tree-based model (XGBoost is default)
+def eval_tree_model(
+        X_test: pd.DataFrame, 
+        y_test: pd.DataFrame, 
+        targets: list, 
+        model: Any, 
+        y_scaler: StandardScaler, 
+        method: str='xgb'
+    ):
+    '''
+    Evaluates a tree-based model (XGBoost is default) on the site level.
+    '''
     res = {target: {'site': [], 'IGBP': [], 'Koppen': [], 
                         'R2': [], 'RMSE': [], 'nMAE': [],
                          'RAE': [],} for target in targets}
@@ -56,7 +81,14 @@ def eval_tree_model(X_test: pd.DataFrame, y_test: pd.DataFrame, targets: list, m
         print(f"{target}:\t{r['R2'].mean():.3f}\t{r['RMSE'].mean():.3f}\t{r['RAE'].mean():.3f}\t{r['nMAE'].mean():.3f}")
     return res
 
-def _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_size=32):
+def _eval_model_common(
+        test_dataset: Any, 
+        test: pd.DataFrame, 
+        targets: list, 
+        predict_fn: Callable, 
+        y_scaler: StandardScaler, 
+        batch_size: int=32,
+    ):
     res = {target: {'site': [], 'IGBP': [], 'Koppen': [], 
                         'R2': [], 'RMSE': [], 'nMAE': [],
                          'RAE': [],} for target in targets}
@@ -66,7 +98,7 @@ def _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_
         site_subset = Subset(test_dataset, site_indices)
         site_loader = DataLoader(site_subset, batch_size=batch_size, shuffle=False)
 
-        preds, true = predict_fn(site_loader, site)
+        preds, true = predict_fn(site_loader)
         if preds.ndim == 1:
             preds, true = preds.reshape(1, -1), true.reshape(1, -1)
 
@@ -82,7 +114,17 @@ def _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_
         print(f"{target}:\t{r['R2'].mean():.3f}\t{r['RMSE'].mean():.3f}\t{r['RAE'].mean():.3f}\t{r['nMAE'].mean():.3f}")
     return res
 
-def append_results(res, test, site, y_site, preds, targets):
+def append_results(
+        res: dict, 
+        test: pd.DataFrame, 
+        site: str, 
+        y_site: np.ndarray, 
+        preds: np.ndarray,
+        targets: list,
+    ):
+    '''
+    Writer function to process outputs.
+    '''
     site_meta = test[test.site == site].iloc[0]
     for idx, target in enumerate(targets):
         res[target]['site'].append(site)
@@ -94,19 +136,47 @@ def append_results(res, test, site, y_site, preds, targets):
         res[target]['nMAE'].append(normalized_mae(np.mean(y_site[:, idx]), y_site[:, idx], preds[:, idx]))
     return res
 
-def eval_nn_model(test_dataset, test, targets, model, architecture, device, y_scaler, batch_size=32):
-    def predict_fn(loader, site):
+def eval_nn_model(
+        test_dataset: Any, 
+        test: pd.DataFrame, 
+        targets: list, 
+        model: Any, 
+        architecture: str, 
+        device: str, 
+        y_scaler: StandardScaler, 
+        batch_size: int=32
+    ):
+    '''A wrapper inference function for any temporal model but TAM-RL'''
+    def predict_fn(loader):
         return nn_predict(model, loader, architecture, device)
     return _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_size)
 
 
-def eval_tamrl_model(test_dataset, test, targets, forward_model, inverse_model, architecture, device, y_scaler, batch_size=32):
-    def predict_fn(loader, site):
+def eval_tamrl_model(
+        test_dataset: Any, 
+        test: pd.DataFrame, 
+        targets: list, 
+        forward_model: Any, 
+        inverse_model: Any, 
+        architecture: str, 
+        device: str, 
+        y_scaler: StandardScaler, 
+        batch_size: int=32,
+    ):
+    '''TAM-RL specific wrapper for inference (forward and inverse models are needed)'''
+    def predict_fn(loader):
         return tamrl_predict(forward_model, inverse_model, loader, architecture, device)
     return _eval_model_common(test_dataset, test, targets, predict_fn, y_scaler, batch_size)
 
-def nn_predict(model: torch.nn.Module, test_loader: DataLoader, architecture: str, device: str):
-    # Get prediction from a torch model using stride=1
+def nn_predict(
+        model: torch.nn.Module, 
+        test_loader: DataLoader, 
+        architecture: str, 
+        device: str
+    ):
+    '''
+    Get prediction from a torch model using stride=1.
+    '''
     stride = 1
     model.eval()
     test_preds = []
@@ -128,8 +198,16 @@ def nn_predict(model: torch.nn.Module, test_loader: DataLoader, architecture: st
     test_true = torch.cat(test_true).squeeze()
     return test_preds, test_true
 
-def tamrl_predict(forward_model: torch.nn.Module, inverse_model: torch.nn.Module, test_loader: DataLoader, architecture: str, device: str):
-    # Get prediction from a torch model using stride=1
+def tamrl_predict(
+        forward_model: torch.nn.Module, 
+        inverse_model: torch.nn.Module, 
+        test_loader: DataLoader, 
+        architecture: str, 
+        device: str
+    ):
+    '''
+    Get prediction from a torch model using stride=1.
+    '''
     stride = 1
     forward_model.eval()
     inverse_model.eval()
@@ -153,14 +231,19 @@ def tamrl_predict(forward_model: torch.nn.Module, inverse_model: torch.nn.Module
 
             test_preds.append(pred[:,-stride,:].detach().cpu())
             test_true.append(y.detach().cpu())
-
-
     test_preds = torch.cat(test_preds).squeeze()
     test_true = torch.cat(test_true).squeeze()
     return test_preds, test_true
 
-def plot_bars(results: dict, metrics: list, targets: list, save_path: str=""):
-    # Produce barplot of average metrics across all test sites
+def plot_bars(
+        results: dict, 
+        metrics: list, 
+        targets: list, 
+        save_path: str="",
+    ):
+    '''
+    Produce barplot of average metrics across all test sites.
+    '''
     palette = [ "#543005", "#8c510a", "#bf812d", "#80cdc1", "#35978f", "#003c30"   ]
     models = list(results.keys())
     fig, axes = plt.subplots(len(metrics), len(targets), figsize=(16, 16), sharey='row')
@@ -211,8 +294,16 @@ def plot_bars(results: dict, metrics: list, targets: list, save_path: str=""):
         plt.savefig(os.join(save_path, "barplot.png"))
     plt.show()
 
-def plot_heatmap(results: dict, metrics: list, targets: list, classification: str='IGBP', save_path: str=""):
-    # Creates a figure with metrics averaged by the selected classification groups
+def plot_heatmap(
+        results: dict, 
+        metrics: list, 
+        targets: list, 
+        classification: str='IGBP', 
+        save_path: str=""
+    ):
+    '''
+    Creates a figure with metrics averaged by the selected classification groups.
+    '''
     koppen_map = {
         'A': 'Tropical',
         'B': 'Arid',
