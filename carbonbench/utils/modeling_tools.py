@@ -1,8 +1,17 @@
+'''
+This module contains a custom torch function accounting for sample quality, IGBP and Koppen class balance, and
+using a physics-guided constraint.
+'''
+
 import torch
 
 class CustomLoss(torch.nn.Module):
     """Custom loss function with carbon balance constraint and climate weighting."""
-    def __init__(self, IGBP_weights, Koppen_weights, device='cuda'):
+    def __init__(self, 
+                IGBP_weights: dict,
+                Koppen_weights: dict,
+                device: str='cuda'
+        ):
         super().__init__()
         self.mse = torch.nn.MSELoss(reduction='none')
         self.IGBP_weights = IGBP_weights

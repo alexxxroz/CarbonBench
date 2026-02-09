@@ -1,9 +1,22 @@
+'''
+This module contains transformer-based architectures implemented in pytorch.
+'''
+
 import torch
 import torch.nn as nn
 import numpy as np
 
 class transformer(nn.Module):
-    def __init__(self, input_dynamic_channels, input_static_channels, output_channels, seq_len, hidden_dim, nhead, num_layers, dropout):
+    def __init__(self, 
+                input_dynamic_channels: int, 
+                input_static_channels: int, 
+                output_channels: int, 
+                seq_len: int, 
+                hidden_dim: int, 
+                nhead: int, 
+                num_layers: int, 
+                dropout: float,
+        ):
         super().__init__()
         self.embedding = nn.Linear(input_dynamic_channels + input_static_channels, hidden_dim)
         
@@ -34,9 +47,20 @@ class transformer(nn.Module):
         return x
     
 class patch_transformer(nn.Module):
-    def __init__(self, input_dynamic_channels: int, input_static_channels: int, output_channels: int,
-        seq_len: int, pred_len: int, patch_len: int, stride: int, hidden_dim: int = 128,
-        nhead: int = 4, num_layers: int = 3, dropout: float = 0.1, dyn_pool: str = "mean"):
+    def __init__(self, 
+                input_dynamic_channels: int, 
+                input_static_channels: int, 
+                output_channels: int,
+                seq_len: int, 
+                pred_len: int, 
+                patch_len: int, 
+                stride: int, 
+                hidden_dim: int = 128,
+                nhead: int = 4, 
+                num_layers: int = 3, 
+                dropout: float = 0.1, 
+                dyn_pool: str = "mean"
+        ):
         super().__init__()
         
         if dyn_pool not in ("mean",):

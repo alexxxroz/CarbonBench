@@ -1,3 +1,7 @@
+'''
+This module contains util functions to process, split and visualize ground true observations.
+'''
+
 import os
 import json
 import numpy as np
@@ -15,8 +19,14 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(BASE, "..", "..")
 DATA = os.path.join(ROOT, "data")
 
-def load_targets(targets: list=['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NEE_VUT_USTAR50'],
-                 qc: bool=True):
+def load_targets(
+        targets: list=['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NEE_VUT_USTAR50'],
+        qc: bool=True
+    ):
+    '''
+    This function loads a file containing ground-true, pre-processes it, and joins Koppen climate classes,
+    returning a pandas dataframe as a reusult.
+    '''
     df = pd.read_parquet(f'{DATA}/target_fluxes.parquet')
     df = df.replace(-9999, np.nan)
     df.TIMESTAMP = pd.to_datetime(df.TIMESTAMP, format='%Y%m%d')
@@ -37,11 +47,17 @@ def load_targets(targets: list=['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NE
     df.dropna(inplace=True)
     return df
 
-def split_targets(df: pd.DataFrame, task_type: str='zero-shot', split_type: str='IGBP',
-                  verbose: bool=True, plot: bool=True):
+def split_targets(
+        df: pd.DataFrame, 
+        split_type: str='IGBP',
+        verbose: bool=True, 
+        plot: bool=True,
+        save_path: str='',
+        **kwargs):
     '''
-    This function performs constrained stratified train-test split of targets. It ensures equal startification of sites by Koppen climate class
-    and that at least 1 site from every IGBP class is represented in the test dataset.
+    This function performs constrained stratified train-test split of targets. 
+    It ensures equal startification of sites by Koppen climate class
+    and IGBP class in the test set depending on the split_type (Koppen vs IGBP).
     '''
     random_state = 56 # do not change the random state, otherwise your results won't be comparable to the results of others
     
@@ -101,30 +117,16 @@ def split_targets(df: pd.DataFrame, task_type: str='zero-shot', split_type: str=
     y_train, y_test = df[df.site.isin(train_sites)], df[df.site.isin(test_sites)] 
     
     if plot:
-        plot_sites(y_train.copy(), y_test.copy(), split_type)
+        plot_sites(y_train.copy(), y_test.copy(), split_type, save_path)
 
-    if task_type=='zero-shot':
-        return y_train, y_test
-    elif task_type=='few-shot':
-        y_finetune = []
-        y_test_query = []
+    return y_train, y_test
         
-        fine_tune_ratio = 0.2  
-        for site in y_test.site.unique():
-            site_df = y_test[y_test.site == site].sort_values('date')
-        
-            n_samples = int(np.floor(len(site_df)*0.2))
-            support = site_df.iloc[:n_samples]
-            query = site_df.iloc[n_samples:]
-
-            y_finetune.append(support)
-            y_test_query.append(query)
-
-        y_finetune = pd.concat(y_finetune)
-        y_test = pd.concat(y_test_query)
-        return y_train, y_test, y_finetune
-        
-def plot_sites(train: pd.DataFrame, test: pd.DataFrame, split_type: str='IGBP', save_path: str=''):
+def plot_sites(
+        train: pd.DataFrame, 
+        test: pd.DataFrame, 
+        split_type: str='IGBP', 
+        save_path: str=''
+    ):
     '''
     This function takes train and test dataframes and plots all the sites on the same map.
     '''
@@ -169,9 +171,16 @@ def plot_sites(train: pd.DataFrame, test: pd.DataFrame, split_type: str='IGBP', 
         plt.savefig(os.join(save_path, 'sites_map.png'), bbox_inches='tight', edgecolor='none') 
     plt.show()
     
-def plot_site_ts(df: pd.DataFrame, targets: list, include_qc: bool=True, qc_threshold: int=0.75, site_name: str='random', save_path: str=''):
+def plot_site_ts(
+        df: pd.DataFrame, 
+        targets: list, 
+        include_qc: bool=True, 
+        qc_threshold: int=0.75, 
+        site_name: str='random', 
+        save_path: str=''
+    ):
     '''
-    This function creates a time series plot for a set of targets from a given or randomly selected site. 
+    This function creates a time series plot for targets from a given or randomly selected site. 
     If NEE_VUT_USTAR50_QC is included, the areas of high and low data quality are highlighted.
     '''
     koppen_map = {

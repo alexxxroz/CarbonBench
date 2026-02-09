@@ -1,9 +1,20 @@
+'''
+This module contains recurrent NN-architectures implemented in pytorch.
+'''
+
 import numpy as np
 import torch
 import torch.nn as nn
 
 class lstm(torch.nn.Module):
-	def __init__(self, input_dynamic_channels, hidden_dim, output_channels, dropout, layers=1, **kwargs):
+	def __init__(self, 
+              input_dynamic_channels: int, 
+              hidden_dim: int, 
+              output_channels: int, 
+              dropout: float, 
+              layers: int=1, 
+              **kwargs
+        ):
 		super().__init__()
 
 		self.input_channels = input_dynamic_channels
@@ -32,7 +43,14 @@ class lstm(torch.nn.Module):
 		return out
 
 class ctlstm_decoder(torch.nn.Module):
-    def __init__(self, input_dynamic_channels, input_static_channels, hidden_dim, output_channels, dropout, layers=1):
+    def __init__(self, 
+                input_dynamic_channels: int, 
+                input_static_channels: int, 
+                hidden_dim: int, 
+                output_channels: int, 
+                dropout: float, 
+                layers: int=1
+        ):
         super().__init__()
 
         self.input_dynamic_channels = input_dynamic_channels
@@ -66,7 +84,14 @@ class ctlstm_decoder(torch.nn.Module):
         return out    
 
 class ctlstm(torch.nn.Module):
-    def __init__(self, input_dynamic_channels, input_static_channels, hidden_dim, output_channels, dropout, layers=1):
+    def __init__(self, 
+                input_dynamic_channels: int, 
+                input_static_channels: int, 
+                hidden_dim: int, 
+                output_channels: int, 
+                dropout: float, 
+                layers: int=1
+        ):
         super().__init__()
 
         self.input_dynamic_channels = input_dynamic_channels
@@ -99,7 +124,13 @@ class ctlstm(torch.nn.Module):
         return out    
     
 class gru(nn.Module):
-    def __init__(self, input_dynamic_channels, hidden_dim, output_channels, dropout, layers=1):
+    def __init__(self, 
+                input_dynamic_channels: int, 
+                hidden_dim: int, 
+                output_channels: int, 
+                dropout: float, 
+                layers: int=1
+        ):
         super().__init__()
         
         self.input_dynamic_channels = input_dynamic_channels
@@ -121,7 +152,14 @@ class gru(nn.Module):
         return out
     
 class ctgru(nn.Module):
-    def __init__(self, input_dynamic_channels, input_static_channels, hidden_dim, output_channels, dropout, layers=1):
+    def __init__(self, 
+                input_dynamic_channels: int, 
+                input_static_channels: int, 
+                hidden_dim: int, 
+                output_channels: int, 
+                dropout: float, 
+                layers: int=1
+        ):
         super().__init__()
 
         self.input_dynamic_channels = input_dynamic_channels
@@ -150,7 +188,14 @@ class ctgru(nn.Module):
         return out    
 
 class tamlstm(torch.nn.Module):
-    def __init__(self, input_dynamic_channels, input_static_channels, hidden_dim, output_channels, dropout, layers=1):
+    def __init__(self, 
+                input_dynamic_channels: int, 
+                input_static_channels: int, 
+                hidden_dim: int, 
+                output_channels: int, 
+                dropout: float, 
+                layers: int=1
+        ):
         super().__init__()
 
         # PARAMETERS
@@ -196,7 +241,12 @@ class tamlstm(torch.nn.Module):
         return out   
     
 class ae_tamrl(torch.nn.Module):
-    def __init__(self, input_channels, hidden_dim, code_dim, output_channels):
+    def __init__(self, 
+                input_channels: int, 
+                hidden_dim: int, 
+                code_dim: int, 
+                output_channels: int
+        ):
         super().__init__()
 
         # PARAMETERS

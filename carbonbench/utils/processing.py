@@ -1,3 +1,8 @@
+'''
+The module contains utils to perform temporal processing of the data for NNs using torch and a similar function for treating 
+the problem as tabular.
+'''
+
 import numpy as np
 import pandas as pd
 from datetime import timedelta
@@ -7,9 +12,29 @@ from torch.utils.data import Dataset, DataLoader
 import sklearn
 from sklearn.preprocessing import OneHotEncoder
 
+mod_bands = [f'sur_refl_b0{i}' for i in range(1,8)] + ['SensorZenith', 'SensorAzimuth', 'SolarZenith', 'SolarAzimuth', 'clouds']
+
 class SlidingWindowDataset(Dataset):
-    def __init__(self, hist: dict, targets: list, include_qc: bool, QC_threshold: int=0,
-                 window_size: int=30, stride: int=15, cat_features: list=['IGBP', 'Koppen', 'Koppen_short'], encoders=None):
+    '''
+    This class allows preparing and wrapping the data into torch Dataset object. It's specifically
+    designed for temporal models. It peforms categorical feature transform, builds time windows
+    for every site and returns them along with qc flag, igbp and koppen sample weights (upsampling/downsampling).
+    '''
+    def __init__(self, 
+                 hist: dict, 
+                 targets: list, 
+                 include_qc: bool, 
+                 QC_threshold: int=0,
+                 window_size: int=30, 
+                 stride: int=15, 
+                 cat_features: list=['IGBP', 'Koppen', 'Koppen_short'], 
+                 encoders=None
+        ):
+        '''
+        This function initializes class variables, performs one-hot encoding of the categorical features,
+        and calss _build_indicies function to pair dataset sample index and site.
+        '''
+
         self.hist = hist
         self.targets = targets + (['NEE_VUT_USTAR50_QC'] if include_qc else [])
         self.window_size = window_size
@@ -18,13 +43,15 @@ class SlidingWindowDataset(Dataset):
         self.include_qc = include_qc
         self.QC_threshold = QC_threshold
         
-        IGBP_CLASSES = ["CRO","CSH","CVM","DBF","DNF","EBF","ENF","GRA","MF","OSH","SAV","SNO","URB","WAT","WET","WSA"]
+        IGBP_CLASSES = ["CRO","CSH","CVM","DBF","DNF","EBF","ENF","GRA","MF","OSH","SAV",
+                        "SNO","URB","WAT","WET","WSA"]
         KOPPEN_CLASSES = ["A","B","C","D","E"]
-        KOPPEN_SHORT_CLASSES = ["Af", "Am", "Aw", "BWh", "BWk", "BSh", "BSk", "Cfa", "Cwa", "Csa", "Csb", "Csc", "Cwb", "Cwc", 
-                                "Cfb", "Cfc", "Dsa", "Dsb", "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc", "Dfd", "ET", "EF"]
+        KOPPEN_SHORT_CLASSES = ["Af", "Am", "Aw", "BWh", "BWk", "BSh", "BSk", "Cfa", "Cwa", 
+                                "Csa", "Csb", "Csc", "Cwb", "Cwc", "Cfb", "Cfc", "Dsa", "Dsb", 
+                                "Dsc", "Dsd", "Dwa", "Dwb", "Dwc", "Dwd", "Dfa", "Dfb", "Dfc",
+                                "Dfd", "ET", "EF"]
         self.igbp2id = {c:i for i,c in enumerate(IGBP_CLASSES)}
         self.koppen2id = {c:i for i,c in enumerate(KOPPEN_CLASSES)}
-        
         
         df = pd.concat(hist, axis=0)
         # Fit or use provided encoders
@@ -49,6 +76,11 @@ class SlidingWindowDataset(Dataset):
         self.indices = self._build_indices()
     
     def _build_indices(self):
+        '''
+        This function applies sliding window of a pre-set size and stride to the time series from each site
+        and store it as a site-index pair. It's done in this fashion to avoid data mixing/leakage, as well as
+        evaluating site-level models performance later.
+        '''
         indices = []
         self.site_data = {} 
 
@@ -93,6 +125,11 @@ class SlidingWindowDataset(Dataset):
         return len(self.indices)
     
     def __getitem__(self, idx):
+        '''
+        This function uses the pre-computed indicies and samples them for each site. It returns
+        continuous and one-hot variables separately. In addition, it returns quality control (qc)
+        tensor and weights of Koppen and IGBP balancing the samples in the dataset.
+        '''
         site, i = self.indices[idx]
         df_site, cat_encoded = self.site_data[site]
         
@@ -119,8 +156,20 @@ class SlidingWindowDataset(Dataset):
                torch.from_numpy(koppen_w)
 
 class SlidingWindowDatasetTAMRL(SlidingWindowDataset):
-    def __init__(self, hist: dict, targets: list, include_qc: bool, QC_threshold: int=0,
-                 window_size: int=30, stride: int=15, cat_features: list=['IGBP', 'Koppen', 'Koppen_short'], encoders=None):
+    '''
+    This class inherits SlidingWindowDataset and builds upon it to train and test Task-Aware Modulation for Representation
+    Learning (TAM-RL) framework. The main difference is usage of anchor (query) and support samples during training and inference.
+    '''
+    def __init__(self, 
+                 hist: dict, 
+                 targets: list, 
+                 include_qc: bool, 
+                 QC_threshold: int=0,
+                 window_size: int=30, 
+                 stride: int=15, 
+                 cat_features: list=['IGBP', 'Koppen', 'Koppen_short'], 
+                 encoders=None
+        ):
         super().__init__(hist, targets, include_qc, QC_threshold, window_size, stride, cat_features, encoders)
     
         # Build site -> [indices] mapping
@@ -191,8 +240,14 @@ class SlidingWindowDatasetTAMRL(SlidingWindowDataset):
                 torch.from_numpy(igbp_w),
                 torch.from_numpy(koppen_w))
     
-def historical_cache(df: pd.DataFrame, era: pd.DataFrame, mod: pd.DataFrame, x_scaler: sklearn.preprocessing._data.StandardScaler, 
-                      window_size: int, cat_features: list=['IGBP', 'Koppen', 'Koppen_short']):
+def historical_cache(
+        df: pd.DataFrame, 
+        era: pd.DataFrame, 
+        mod: pd.DataFrame, 
+        x_scaler: sklearn.preprocessing._data.StandardScaler, 
+        window_size: int, 
+        cat_features: list=['IGBP', 'Koppen', 'Koppen_short']
+    ):
     """
     Precompute extra historical window for every site
     
@@ -227,7 +282,17 @@ def historical_cache(df: pd.DataFrame, era: pd.DataFrame, mod: pd.DataFrame, x_s
         site_data[site] = df_extended
     return site_data
     
-def tabular(df: pd.DataFrame, targets: list, include_qc: bool=True, QC_threshold: int=0, cat_features: list=['IGBP', 'Koppen', 'Koppen_short']):
+def tabular(
+        df: pd.DataFrame, 
+        targets: list, 
+        include_qc: bool=True, 
+        QC_threshold: int=0, 
+        cat_features: list=['IGBP', 'Koppen', 'Koppen_short']
+    ):
+    '''
+    Resamples time series from each site and interpolates MODIS observations dropping the leftover Nans.
+    Returns feature and target dataframes suitable for training tree-based models.
+    '''
     dfs = []
     for site in df.site.unique():
         df_site = df[df.site==site].set_index('date').resample('D').asfreq().reset_index()
@@ -246,5 +311,3 @@ def tabular(df: pd.DataFrame, targets: list, include_qc: bool=True, QC_threshold
         return X, y, y_qc
     else:
         return X, y
-
-mod_bands = [f'sur_refl_b0{i}' for i in range(1,8)] + ['SensorZenith', 'SensorAzimuth', 'SolarZenith', 'SolarAzimuth', 'clouds']
