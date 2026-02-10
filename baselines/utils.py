@@ -3,10 +3,35 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+import carbonbench
+
+
+def set_seed(seed):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
+def get_model(model_name, **kwargs):
+    model_map = {
+        'lstm': carbonbench.lstm,
+        'ctlstm': carbonbench.ctlstm,
+        'gru': carbonbench.gru,
+        'ctgru': carbonbench.ctgru,
+        'transformer': carbonbench.transformer,
+        'patch_transformer': carbonbench.patch_transformer,
+        'tam-rl': carbonbench.lstm,
+    }
+    return model_map[model_name](**kwargs)
+
 def train_tamrl(forward_model, inverse_model, train_loader_tamrl, val_loader_tamrl, criterion, device, num_epoch, stride, optimizer, scheduler, patience=10):
     '''Training TAM-RL'''
     best = np.inf
     no_improve_count = 0
+    best_model_fw = forward_model.state_dict()
+    best_model_inv = inverse_model.state_dict()
     for epoch in tqdm(range(num_epoch)):
         inverse_model.train()
         forward_model.train()

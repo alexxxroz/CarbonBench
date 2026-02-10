@@ -1,5 +1,5 @@
 '''
-This module contains util functions to perfrom loading, joining and processing of the features.
+This module contains util functions to perform loading, joining and processing of the features.
 '''
 
 import os
@@ -79,7 +79,7 @@ def join_features(
         df_test[targets]  = y_scaler.transform(df_test[targets])
         return df_train, df_val, df_test, x_scaler, y_scaler
     else:
-        return df_train, df_test
+        return df_train, df_val, df_test, None, None
     
 def plot_feature_heatmap(
         df: pd.DataFrame, 
@@ -88,11 +88,11 @@ def plot_feature_heatmap(
         figsize: tuple=(25,25)
     ):
     '''
-    Creates a heatmap of the existing continious variables.
+    Creates a heatmap of the existing continuous variables.
     Warning: the image can explode when used with the Full feature set of ERA5 Land.
     '''
     plt.rcParams.update({'font.size': 14, 'font.family':'monospace', 'figure.figsize': figsize})
     sns.heatmap(df.drop(['date', 'site'] + cat_features, axis=1).corr(), fmt=".2f", annot=True, cmap="BrBG")
     if len(save_path) > 0:
-        plt.savefig(os.path.join(save_path, f"featrue_heatmap.png"))
+        plt.savefig(os.path.join(save_path, f"feature_heatmap.png"))
     plt.show()

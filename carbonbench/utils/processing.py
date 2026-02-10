@@ -32,7 +32,7 @@ class SlidingWindowDataset(Dataset):
         ):
         '''
         This function initializes class variables, performs one-hot encoding of the categorical features,
-        and calss _build_indicies function to pair dataset sample index and site.
+        and calls _build_indices function to pair dataset sample index and site.
         '''
 
         self.hist = hist
@@ -124,36 +124,38 @@ class SlidingWindowDataset(Dataset):
     def __len__(self):
         return len(self.indices)
     
-    def __getitem__(self, idx):
+    def _get_sample(self, idx):
         '''
-        This function uses the pre-computed indicies and samples them for each site. It returns
-        continuous and one-hot variables separately. In addition, it returns quality control (qc)
-        tensor and weights of Koppen and IGBP balancing the samples in the dataset.
+        Extract a single sample by index. Returns continuous and one-hot variables separately,
+        along with quality control (qc) tensor and IGBP/Koppen class-balance weights.
         '''
         site, i = self.indices[idx]
         df_site, cat_encoded = self.site_data[site]
-        
+
         df_x = df_site.loc[:, ~df_site.columns.isin(
             self.targets + ['date', 'site'] + self.cat_features)]
         df_y = df_site[[col for col in self.targets if col!='NEE_VUT_USTAR50_QC']]
-        
+
         x_window = df_x.values[i : i + self.window_size, :]
         cat_window = cat_encoded[i : i + self.window_size, :]
-        
+
         y_target = df_y.values[i + self.window_size - self.stride : i + self.window_size, :]
         qc_w = df_site['NEE_VUT_USTAR50_QC'].values[i + self.window_size - self.stride : i + self.window_size] if self.include_qc else np.ones_like(y_target[:,0])
-        
+
         igbp_w = df_site["IGBP"].values[i + self.window_size - self.stride : i + self.window_size]
         koppen_w = df_site["Koppen"].values[i + self.window_size - self.stride : i + self.window_size]
-        igbp_w = np.array([self.igbp2id.get(v, -1) for v in igbp_w], dtype=np.int64) # -1 for unknown class
-        koppen_w = np.array([self.koppen2id.get(v, -1) for v in koppen_w], dtype=np.int64) # -1 for unknown class
-        
-        return torch.tensor(x_window, dtype=torch.float32), \
-               torch.tensor(cat_window, dtype=torch.float32), \
-               torch.tensor(y_target, dtype=torch.float32), \
-               torch.tensor(qc_w, dtype=torch.float32), \
-               torch.from_numpy(igbp_w), \
-               torch.from_numpy(koppen_w)
+        igbp_w = np.array([self.igbp2id.get(v, -1) for v in igbp_w], dtype=np.int64)
+        koppen_w = np.array([self.koppen2id.get(v, -1) for v in koppen_w], dtype=np.int64)
+
+        return (torch.tensor(x_window, dtype=torch.float32),
+                torch.tensor(cat_window, dtype=torch.float32),
+                torch.tensor(y_target, dtype=torch.float32),
+                torch.tensor(qc_w, dtype=torch.float32),
+                torch.from_numpy(igbp_w),
+                torch.from_numpy(koppen_w))
+
+    def __getitem__(self, idx):
+        return self._get_sample(idx)
 
 class SlidingWindowDatasetTAMRL(SlidingWindowDataset):
     '''
@@ -213,32 +215,6 @@ class SlidingWindowDatasetTAMRL(SlidingWindowDataset):
 
         return (torch.tensor(np.stack(x_windows), dtype=torch.float32),
                 torch.tensor(np.stack(cat_windows), dtype=torch.float32))
-    
-    def _get_sample(self, idx):
-        site, i = self.indices[idx]
-        df_site, cat_encoded = self.site_data[site]
-        
-        df_x = df_site.loc[:, ~df_site.columns.isin(
-            self.targets + ['date', 'site'] + self.cat_features)]
-        df_y = df_site[[col for col in self.targets if col!='NEE_VUT_USTAR50_QC']]
-        
-        x_window = df_x.values[i : i + self.window_size, :]
-        cat_window = cat_encoded[i : i + self.window_size, :]
-        
-        y_target = df_y.values[i + self.window_size - self.stride : i + self.window_size, :]
-        qc_w = df_site['NEE_VUT_USTAR50_QC'].values[i + self.window_size - self.stride : i + self.window_size] if self.include_qc else np.ones_like(y_target[:,0])
-        
-        igbp_w = df_site["IGBP"].values[i + self.window_size - self.stride : i + self.window_size]
-        koppen_w = df_site["Koppen"].values[i + self.window_size - self.stride : i + self.window_size]
-        igbp_w = np.array([self.igbp2id.get(v, -1) for v in igbp_w], dtype=np.int64)
-        koppen_w = np.array([self.koppen2id.get(v, -1) for v in koppen_w], dtype=np.int64)
-        
-        return (torch.tensor(x_window, dtype=torch.float32),
-                torch.tensor(cat_window, dtype=torch.float32),
-                torch.tensor(y_target, dtype=torch.float32),
-                torch.tensor(qc_w, dtype=torch.float32),
-                torch.from_numpy(igbp_w),
-                torch.from_numpy(koppen_w))
     
 def historical_cache(
         df: pd.DataFrame, 

@@ -11,9 +11,6 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import warnings
-
-warnings.filterwarnings('ignore')
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(BASE, "..", "..")
@@ -25,13 +22,13 @@ def load_targets(
     ):
     '''
     This function loads a file containing ground-true, pre-processes it, and joins Koppen climate classes,
-    returning a pandas dataframe as a reusult.
+    returning a pandas dataframe as a result.
     '''
     df = pd.read_parquet(f'{DATA}/target_fluxes.parquet')
     df = df.replace(-9999, np.nan)
     df.TIMESTAMP = pd.to_datetime(df.TIMESTAMP, format='%Y%m%d')
     df = df.rename(columns={'TIMESTAMP': 'date'})
-    df = df[df.date>=pd.to_datetime('2000-02-24')] # start date of MODIS obsevations
+    df = df[df.date>=pd.to_datetime('2000-02-24')] # start date of MODIS observations
 
     with open(f'{DATA}/koppen_sites.json', 'r') as file:
         koppen = json.load(file)
@@ -56,7 +53,7 @@ def split_targets(
         **kwargs):
     '''
     This function performs constrained stratified train-test split of targets. 
-    It ensures equal startification of sites by Koppen climate class
+    It ensures equal stratification of sites by Koppen climate class
     and IGBP class in the test set depending on the split_type (Koppen vs IGBP).
     '''
     random_state = 56 # do not change the random state, otherwise your results won't be comparable to the results of others
@@ -98,7 +95,7 @@ def split_targets(
             random_state=random_state
         )
     else:
-        raise f"ERROR: uknown split_type={split_type}"
+        raise ValueError(f"Unknown split_type={split_type}")
         
     if verbose:
         print(f"Train sites: {len(train_sites)}, Test sites: {len(test_sites)}")

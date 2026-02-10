@@ -20,7 +20,7 @@ from tqdm import tqdm
 
 import carbonbench
 
-from utils import train_tamrl
+from utils import train_tamrl, get_model, set_seed
 
 # ANSI color codes
 class Colors:
@@ -50,26 +50,6 @@ def parse_args():
                         help='Device (cuda or cpu)')
     return parser.parse_args()
 
-
-def set_seed(seed):
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-
-def get_model(model_name, **kwargs):
-    model_map = {
-        'lstm': carbonbench.lstm,
-        'ctlstm': carbonbench.ctlstm,
-        'gru': carbonbench.gru,
-        'ctgru': carbonbench.ctgru,
-        'transformer': carbonbench.transformer,
-        'patch_transformer': carbonbench.patch_transformer,
-        'tam-rl': carbonbench.lstm # for TAM-RL use lstm first to pre-train the decoder, and then switch to AE and TAMLSTM
-    }
-    return model_map[model_name](**kwargs)
 
 def get_param_grid(model_name):
     # grid for actual search

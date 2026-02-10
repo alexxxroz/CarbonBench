@@ -26,7 +26,7 @@ def extract_best_params(input_dir, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     
     
-    models_to_process = ['lstm', 'gru', 'ctlstm', 'ctgru', 'transformer']
+    models_to_process = ['lstm', 'gru', 'ctlstm', 'ctgru', 'transformer', 'patch_transformer', 'tam-rl']
     
     subdirs = [d for d in os.listdir(input_dir) 
                if os.path.isdir(os.path.join(input_dir, d))]

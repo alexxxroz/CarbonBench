@@ -10,9 +10,10 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Subset
 
-from sklearn.metrics import r2_score, root_mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score, root_mean_squared_error
 
 import carbonbench
+from utils import get_model
 
 
 def parse_args():
@@ -40,33 +41,6 @@ def load_config(config_path):
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-
-def get_model(model_name, **kwargs):
-    model_map = {
-        'lstm': carbonbench.lstm,
-        'ctlstm': carbonbench.ctlstm,
-        'gru': carbonbench.gru,
-        'ctgru': carbonbench.ctgru,
-        'transformer': carbonbench.transformer,
-        'patch_transformer': carbonbench.patch_transformer,
-    }
-    return model_map[model_name](**kwargs)
-
-
-def relative_absolute_error(y_true, y_pred):
-    mae_model = mean_absolute_error(y_true, y_pred)
-    y_naive = np.mean(y_true) * np.ones_like(y_true)
-    mae_naive = mean_absolute_error(y_true, y_naive)
-    
-    if mae_naive == 0:
-        return np.inf  
-    rae = mae_model / mae_naive
-    return rae
-
-def mean_absolute_error_normalized(mean_flux: float, true: np.ndarray, pred: np.ndarray):
-    # computes absolute error normalized by site mean flux
-    mape = np.abs(pred - true) / (np.abs(mean_flux) + 1e-9)
-    return np.mean(mape)
 
 def get_predictions(model, loader, model_name, device):
     """Get predictions from a single model for all samples in loader."""
@@ -320,8 +294,8 @@ def main():
             
             r2 = r2_score(y_true, y_pred)
             rmse = root_mean_squared_error(y_true, y_pred)
-            nmae = mean_absolute_error_normalized(np.mean(y_true), y_true, y_pred)
-            rae = relative_absolute_error(y_true, y_pred)
+            nmae = carbonbench.normalized_mae(np.mean(y_true), y_true, y_pred)
+            rae = carbonbench.relative_absolute_error(y_true, y_pred)
             
             results[target]['site'].append(site)
             results[target]['IGBP'].append(test[test.site == site].IGBP.values[0])

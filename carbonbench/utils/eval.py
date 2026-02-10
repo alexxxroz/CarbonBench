@@ -291,7 +291,7 @@ def plot_bars(
 
     plt.tight_layout(rect=[0, 0, 1, 0.99])
     if len(save_path) > 0:
-        plt.savefig(os.join(save_path, "barplot.png"))
+        plt.savefig(os.path.join(save_path, "barplot.png"))
     plt.show()
 
 def plot_heatmap(
@@ -339,7 +339,7 @@ def plot_heatmap(
     
     plt.tight_layout(rect=[0, 0, 1, 0.99])
     if len(save_path) > 0:
-        plt.savefig(os.join(save_path, f"{classification}_heatmap.png"))
+        plt.savefig(os.path.join(save_path, f"{classification}_heatmap.png"))
     plt.show()
     
 
