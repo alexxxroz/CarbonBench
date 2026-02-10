@@ -4,7 +4,7 @@
   <img src="CarbonBench.png" width="700"/>
 </p>
 
-CarbonBench comprises over 1.3 million daily observations from 567 eddy covariance flux tower sites globally (2000--2024). It provides stratified evaluation protocols that explicitly test generalization across unseen vegetation types and climate regimes, a harmonized set of remote sensing and meteorological features, and reproducible baselines ranging from tree-based methods to domain-generalization architectures.
+CarbonBench comprises over 1.3 million daily observations from 567 eddy covariance flux tower sites globally (2000-2024). It provides stratified evaluation protocols that explicitly test generalization across unseen vegetation types and climate regimes, a harmonized set of remote sensing and meteorological features, and reproducible baselines ranging from tree-based methods to domain-generalization architectures.
 
 ## Prediction Targets
 
@@ -14,13 +14,13 @@ All targets are derived from eddy covariance measurements standardized under the
 - **RECO** (RECO_NT_VUT_USTAR50): ecosystem respiration
 - **NEE** (NEE_VUT_USTAR50): net ecosystem exchange (NEE = -GPP + RECO)
 
-Each observation includes a continuous quality control flag (NEE_VUT_USTAR50_QC, 0--1).
+Each observation includes a continuous quality control flag (NEE_VUT_USTAR50_QC, 0-1).
 
 ## Features
 
 | Source | Variables | Description |
 |--------|-----------|-------------|
-| MODIS MOD09GA | 12 | 7 surface reflectance bands, sensor/solar geometry, cloud fraction |
+| MOD09GA | 12 | 7 surface reflectance bands, sensor/solar geometry, cloud fraction |
 | ERA5-Land | 6 / 36 / 150 | Minimal, Standard, or Full meteorological feature sets |
 | Site metadata | 2 + 3 categorical | Latitude, longitude, IGBP vegetation type, Köppen climate class |
 
