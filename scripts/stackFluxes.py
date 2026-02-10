@@ -32,7 +32,7 @@ ameri['Site ID'] = 'AMF_' + ameri['Site ID']
 icos = pd.read_csv('../data/ICOS2025_Metadata.csv')
 
 '''Extracting JapanFlux metadata'''
-jap_path = '/media/aleksei/303AFBEF3AFBB048/FLUX/JapanFlux2024'
+jap_path = 'PATH/TO/JapanFlux2024'
 jap_files = listdir(jap_path)
 jap_dir = [x for x in listdir(jap_path) if (x.split('.')[-1]!='zip')]
 data_jap = {x: [] for x in ['site', 'lat', 'lon', 'IGBP']}

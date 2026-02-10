@@ -13,6 +13,9 @@ baselines/logs
 examples/zero-shot_experiments.ipynb
 examples/few-shot_experiments.ipynb
 few_shot/
+baselines/*.sh
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
