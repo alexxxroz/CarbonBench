@@ -168,7 +168,7 @@ def plot_sites(
 
     plt.tight_layout(pad=0)
     if len(save_path) > 0:
-        plt.savefig(os.join(save_path, 'sites_map.png'), bbox_inches='tight', edgecolor='none') 
+        plt.savefig(os.path.join(save_path, 'sites_map.png'), bbox_inches='tight', edgecolor='none') 
     plt.show()
     
 def plot_site_ts(

@@ -3,7 +3,6 @@ from .utils.features import load_modis, load_era, join_features, plot_feature_he
 from .utils.processing import SlidingWindowDataset, SlidingWindowDatasetTAMRL, historical_cache, tabular
 from .utils.eval import eval_tree_model, eval_nn_model, eval_tamrl_model, append_results, nn_predict, plot_heatmap, plot_bars
 from .utils.modeling_tools import CustomLoss
-from .models.mlp import mlp
 from .models.lstm import lstm, ctlstm, gru, ctgru, tamlstm, ae_tamrl, ctlstm_decoder
 from .models.transformers import transformer, patch_transformer
 

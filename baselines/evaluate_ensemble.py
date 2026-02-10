@@ -18,7 +18,7 @@ import carbonbench
 def parse_args():
     parser = argparse.ArgumentParser(description='Evaluate ensemble models on test set')
     parser.add_argument('--model', type=str, required=True,
-                        choices=['lstm', 'ctlstm', 'gru', 'ctgru', 'transformer', 'patch_transformer'],
+                        choices=['lstm', 'ctlstm', 'gru', 'ctgru', 'transformer', 'patch_transformer', 'tam-rl'],
                         help='Model architecture')
     parser.add_argument('--split_type', type=str, required=True,
                         choices=['IGBP', 'Koppen'],
@@ -73,27 +73,59 @@ def get_predictions(model, loader, model_name, device):
     model.eval()
     all_preds = []
     all_true = []
-    
+
     with torch.no_grad():
         for x, x_static, y, _, _, _ in loader:
             x = x.to(device)
             x_static = x_static.to(device)
-            
-            if model_name in ['lstm', 'gru']:
+
+            if model_name in ['lstm', 'gru', 'tam-rl']:
                 pred = model(x)
+                all_preds.append(pred[:, -1, :].cpu().numpy())
             else:
                 pred = model(x, x_static)
-            
-            # take last timestep prediction
-            all_preds.append(pred[:, -1, :].cpu().numpy())
-            
-            # FIXED: take last timestep for y as well (y shape: batch, stride, n_targets)
+                all_preds.append(pred[:, -1, :].cpu().numpy())
+
             y_cpu = y[:, -1, :].cpu().numpy()
             all_true.append(y_cpu)
-    
+
     all_preds = np.concatenate(all_preds, axis=0)
     all_true = np.concatenate(all_true, axis=0)
-    
+
+    return all_preds, all_true
+
+
+def get_predictions_tamrl(forward_model, inverse_model, loader, device):
+    """Get predictions from TAM-RL models."""
+    forward_model.eval()
+    inverse_model.eval()
+    all_preds = []
+    all_true = []
+
+    with torch.no_grad():
+        for x, x_static, y, _, _, _, x_sup, x_static_sup in loader:
+            x = x.to(device)
+            x_static = x_static.to(device)
+            x_sup = x_sup.to(device)
+            x_static_sup = x_static_sup.to(device)
+
+            batch, window, _ = x.shape
+            batch_dynamic_input = torch.cat((x, x_sup), dim=0)
+            batch_static_input = torch.cat((x_static, x_static_sup), dim=0)
+
+            batch_input = torch.cat((batch_dynamic_input, batch_static_input), dim=-1).to(device)
+            latent_repr, _, _, _ = inverse_model(x=batch_input.float())
+
+            batch_static_input = latent_repr[:x.shape[0]].unsqueeze(1).repeat(1, window, 1)
+            pred = forward_model(x_dynamic=x.float(), x_static=batch_static_input.float())
+
+            all_preds.append(pred[:, -1, :].cpu().numpy())
+            y_cpu = y[:, -1, :].cpu().numpy()
+            all_true.append(y_cpu)
+
+    all_preds = np.concatenate(all_preds, axis=0)
+    all_true = np.concatenate(all_true, axis=0)
+
     return all_preds, all_true
 
 
@@ -115,7 +147,10 @@ def main():
     available_seeds = []
     for seed in seeds:
         model_subdir = f"{args.model}_seed{seed}_{args.split_type}"
-        model_path = os.path.join(args.model_dir, model_subdir, 'model.pt')
+        if args.model == 'tam-rl':
+            model_path = os.path.join(args.model_dir, model_subdir, 'forward_model.pt')
+        else:
+            model_path = os.path.join(args.model_dir, model_subdir, 'model.pt')
         if os.path.exists(model_path):
             available_seeds.append(seed)
         else:
@@ -169,52 +204,98 @@ def main():
     input_static_channels = x_static_sample.shape[2]
     output_channels = len(targets)
     
-    # Build model kwargs
-    model_kwargs = {
-        'input_dynamic_channels': input_dynamic_channels,
-        'hidden_dim': best_params['hidden_dim'],
-        'output_channels': output_channels,
-        'dropout': best_params['dropout'],
-    }
-    
-    if args.model not in ['lstm', 'gru']:
-        model_kwargs['input_static_channels'] = input_static_channels
-    
-    if 'transformer' in args.model:
-        model_kwargs['nhead'] = best_params['nhead']
-        model_kwargs['num_layers'] = best_params['num_layers']
-        model_kwargs['seq_len'] = window_size
-        if 'patch' in args.model:
-            model_kwargs['pred_len'] = stride
-            model_kwargs['patch_len'] = 4
-            model_kwargs['stride'] = 4
+    if args.model == 'tam-rl':
+        model_kwargs = {
+            'input_dynamic_channels': input_dynamic_channels,
+            'hidden_dim': best_params['hidden_dim'],
+            'output_channels': output_channels,
+            'dropout': best_params['dropout'],
+            'input_static_channels': input_static_channels,
+            'layers': best_params['layers'],
+            'latent_dim': best_params['latent_dim'],
+        }
     else:
-        model_kwargs['layers'] = best_params['layers']
+        model_kwargs = {
+            'input_dynamic_channels': input_dynamic_channels,
+            'hidden_dim': best_params['hidden_dim'],
+            'output_channels': output_channels,
+            'dropout': best_params['dropout'],
+        }
+
+        if args.model not in ['lstm', 'gru']:
+            model_kwargs['input_static_channels'] = input_static_channels
+
+        if 'transformer' in args.model:
+            model_kwargs['nhead'] = best_params['nhead']
+            model_kwargs['num_layers'] = best_params['num_layers']
+            model_kwargs['seq_len'] = window_size
+            if 'patch' in args.model:
+                model_kwargs['pred_len'] = stride
+                model_kwargs['patch_len'] = 4
+                model_kwargs['stride'] = 4
+        else:
+            model_kwargs['layers'] = best_params['layers']
+
+    # Create TAM-RL test dataset if needed
+    if args.model == 'tam-rl':
+        test_dataset_tamrl = carbonbench.SlidingWindowDatasetTAMRL(
+            test_hist, targets, include_qc,
+            window_size=window_size, stride=1, QC_threshold=test_QC_threshold,
+            encoders=encoders,
+            cat_features=['IGBP', 'Koppen', 'Koppen_short']
+        )
     
     results = {target: {'site': [], 'IGBP': [], 'Koppen': [], 
                         'R2': [], 'RMSE': [], 'nMAE': [],
                          'RAE': [],} for target in targets}
     
-    for site in test_dataset.get_sites():
-        site_indices = test_dataset.get_site_indices(site)
-        site_subset = Subset(test_dataset, site_indices)
+    eval_dataset = test_dataset_tamrl if args.model == 'tam-rl' else test_dataset
+
+    for site in eval_dataset.get_sites():
+        site_indices = eval_dataset.get_site_indices(site)
+        site_subset = Subset(eval_dataset, site_indices)
         site_loader = DataLoader(site_subset, batch_size=args.batch_size, shuffle=False)
-        
+
         # Collect predictions from all seed models
         all_seed_preds = []
         true_values = None
-        
+
         for seed in available_seeds:
             model_subdir = f"{args.model}_seed{seed}_{args.split_type}"
-            model_path = os.path.join(args.model_dir, model_subdir, 'model.pt')
-            
-            model = get_model(args.model, **model_kwargs)
-            model.load_state_dict(torch.load(model_path, map_location=device))
-            model = model.to(device)
-            
-            preds, true = get_predictions(model, site_loader, args.model, device)
+
+            if args.model == 'tam-rl':
+                forward_path = os.path.join(args.model_dir, model_subdir, 'forward_model.pt')
+                inverse_path = os.path.join(args.model_dir, model_subdir, 'inverse_model.pt')
+
+                forward_model = carbonbench.tamlstm(
+                    model_kwargs['input_dynamic_channels'],
+                    model_kwargs['latent_dim'],
+                    model_kwargs['hidden_dim'],
+                    model_kwargs['output_channels'],
+                    model_kwargs['dropout'],
+                    model_kwargs['layers']
+                ).to(device)
+                inverse_model = carbonbench.ae_tamrl(
+                    input_channels=model_kwargs['input_dynamic_channels'] + model_kwargs['input_static_channels'],
+                    code_dim=model_kwargs['latent_dim'],
+                    hidden_dim=model_kwargs['latent_dim'],
+                    output_channels=model_kwargs['latent_dim']
+                ).to(device)
+
+                forward_model.load_state_dict(torch.load(forward_path, map_location=device))
+                inverse_model.load_state_dict(torch.load(inverse_path, map_location=device))
+
+                preds, true = get_predictions_tamrl(forward_model, inverse_model, site_loader, device)
+            else:
+                model_path = os.path.join(args.model_dir, model_subdir, 'model.pt')
+                model = get_model(args.model, **model_kwargs)
+                model.load_state_dict(torch.load(model_path, map_location=device))
+                model = model.to(device)
+
+                preds, true = get_predictions(model, site_loader, args.model, device)
+
             all_seed_preds.append(preds)
-            
+
             if true_values is None:
                 true_values = true
         

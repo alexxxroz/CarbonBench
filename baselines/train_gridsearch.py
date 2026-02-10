@@ -325,7 +325,7 @@ def main():
     targets = ['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NEE_VUT_USTAR50']
     y = carbonbench.load_targets(targets, qc=True)
     y_train, y_test = carbonbench.split_targets(
-        y, task_type='zero-shot', split_type=args.split_type,
+        y, split_type=args.split_type,
         verbose=True, plot=False
     )
     

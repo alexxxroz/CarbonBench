@@ -31,7 +31,7 @@ echo "Job ID: $SLURM_ARRAY_TASK_ID"
 echo "Model: $MODEL"
 echo "Split: $SPLIT"
 
-python evaluate_ensemble_fix.py \
+python evaluate_ensemble.py \
     --model $MODEL \
     --split_type $SPLIT \
     --device cuda

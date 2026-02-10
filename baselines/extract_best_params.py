@@ -39,17 +39,6 @@ def extract_best_params(input_dir, output_dir):
     
     print(f"Found {len(subdirs)} result directories")
     
-    
-#     # Find all subdirectories with results
-#     subdirs = [d for d in os.listdir(input_dir) 
-#                if os.path.isdir(os.path.join(input_dir, d))]
-    
-#     if not subdirs:
-#         print(f"No subdirectories found in {input_dir}")
-#         return
-    
-#     print(f"Found {len(subdirs)} result directories")
-    
     for subdir in sorted(subdirs):
         csv_path = os.path.join(input_dir, subdir, 'gridsearch_results.csv')
         

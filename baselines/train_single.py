@@ -16,6 +16,8 @@ from tqdm import tqdm
 
 import carbonbench
 
+from utils import train_tamrl
+
 
 def load_config(config_path):
     with open(config_path, 'r') as f:
@@ -26,7 +28,7 @@ def load_config(config_path):
 def parse_args():
     parser = argparse.ArgumentParser(description='CarbonBench Ensemble Model Training')
     parser.add_argument('--model', type=str, required=True,
-                        choices=['lstm', 'ctlstm', 'gru', 'ctgru', 'transformer', 'patch_transformer'],
+                        choices=['lstm', 'ctlstm', 'gru', 'ctgru', 'transformer', 'patch_transformer', 'tam-rl'],
                         help='Model architecture')
     parser.add_argument('--split_type', type=str, required=True,
                         choices=['IGBP', 'Koppen'],
@@ -62,6 +64,7 @@ def get_model(model_name, **kwargs):
         'ctgru': carbonbench.ctgru,
         'transformer': carbonbench.transformer,
         'patch_transformer': carbonbench.patch_transformer,
+        'tam-rl': carbonbench.lstm,
     }
     return model_map[model_name](**kwargs)
 
@@ -95,7 +98,7 @@ def main():
     
     y = carbonbench.load_targets(targets, include_qc)
     y_train, y_test = carbonbench.split_targets(
-        y, task_type='zero-shot', split_type=args.split_type, 
+        y, split_type=args.split_type, 
         verbose=True, plot=False
     )
     
@@ -158,10 +161,10 @@ def main():
         'output_channels': output_channels,
         'dropout': best_params['dropout'],
     }
-    
+
     if args.model not in ['lstm', 'gru']:
         model_kwargs['input_static_channels'] = input_static_channels
-    
+
     if 'transformer' in args.model:
         model_kwargs['nhead'] = best_params['nhead']
         model_kwargs['num_layers'] = best_params['num_layers']
@@ -172,7 +175,10 @@ def main():
             model_kwargs['stride'] = 4
     else:
         model_kwargs['layers'] = best_params['layers']
-    
+
+    if args.model == 'tam-rl':
+        model_kwargs['latent_dim'] = best_params['latent_dim']
+
     model = get_model(args.model, **model_kwargs).to(device)
     
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -203,13 +209,13 @@ def main():
             koppen_w = koppen_w.to(device)
             
             optimizer.zero_grad()
-            
-            if args.model in ['lstm', 'gru']:
+
+            if args.model in ['lstm', 'gru', 'tam-rl']:
                 pred = model(x)
+                loss = criterion(pred[:, -stride:, :], y_batch[:, -stride:, :3], qc, igbp_w, koppen_w)
             else:
                 pred = model(x, x_static)
-            
-            loss = criterion(pred[:, -stride:, :], y_batch[:, -stride:, :3], qc, igbp_w, koppen_w)
+                loss = criterion(pred[:, -stride:, :], y_batch[:, -stride:, :3], qc, igbp_w, koppen_w)
             loss.backward()
             optimizer.step()
             
@@ -231,18 +237,18 @@ def main():
                     x_static = x_static.to(device)
                     y_batch = y_batch.to(device)
                     
-                    if args.model in ['lstm', 'gru']:
+                    if args.model in ['lstm', 'gru', 'tam-rl']:
                         pred = model(x)
                     else:
                         pred = model(x, x_static)
-                    
+
                     val_preds.append(pred.cpu())
                     val_true.append(y_batch.cpu())
-            
+
             val_preds = torch.cat(val_preds)
             val_true = torch.cat(val_true)
             val_loss = criterion(
-                val_preds[:, -stride:, :].to(device), 
+                val_preds[:, -stride:, :].to(device),
                 val_true[:, -stride:, :3].to(device)
             ).item()
             val_losses.append(val_loss)
@@ -255,12 +261,64 @@ def main():
     
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
-    
+
     print(f"\nTraining complete, best val loss: {best_val_loss:.4f}")
-    
-    checkpoint_path = os.path.join(output_path, 'model.pt')
-    torch.save(best_model_state, checkpoint_path)
-    print(f"Model saved to: {checkpoint_path}")
+
+    if args.model == 'tam-rl':
+        inverse_model = carbonbench.ae_tamrl(
+            input_channels=model_kwargs['input_dynamic_channels'] + model_kwargs['input_static_channels'],
+            code_dim=model_kwargs['latent_dim'],
+            hidden_dim=model_kwargs['latent_dim'],
+            output_channels=model_kwargs['latent_dim']
+        ).to(device)
+        forward_model = carbonbench.tamlstm(
+            model_kwargs['input_dynamic_channels'],
+            model_kwargs['latent_dim'],
+            model_kwargs['hidden_dim'],
+            model_kwargs['output_channels'],
+            model_kwargs['dropout'],
+            model_kwargs['layers']
+        ).to(device)
+
+        encoder_weights = {k.replace('encoder.', ''): v for k, v in best_model_state.items() if k.startswith('encoder.')}
+        forward_model.encoder.load_state_dict(encoder_weights)
+
+        criterion_tamrl = carbonbench.CustomLoss(IGBP_weights, Koppen_weights)
+        optimizer_tamrl = optim.Adam(list(inverse_model.parameters()) + list(forward_model.parameters()), lr=1e-3)
+        scheduler_tamrl = StepLR(optimizer_tamrl, step_size=10, gamma=0.5)
+
+        train_dataset_tamrl = carbonbench.SlidingWindowDatasetTAMRL(
+            train_hist, targets, include_qc,
+            window_size=window_size, stride=stride,
+            cat_features=['IGBP', 'Koppen', 'Koppen_short']
+        )
+        train_loader_tamrl = DataLoader(train_dataset_tamrl, batch_size=batch_size, shuffle=True)
+
+        val_dataset_tamrl = carbonbench.SlidingWindowDatasetTAMRL(
+            val_hist, targets, include_qc,
+            window_size=window_size, stride=stride,
+            encoders=train_dataset.encoders,
+            cat_features=['IGBP', 'Koppen', 'Koppen_short']
+        )
+        val_loader_tamrl = DataLoader(val_dataset_tamrl, batch_size=batch_size, shuffle=True)
+
+        print("\nTraining TAM-RL phase...")
+        forward_model, inverse_model = train_tamrl(
+            forward_model, inverse_model, train_loader_tamrl, val_loader_tamrl,
+            criterion_tamrl, device, args.num_epochs, stride, optimizer_tamrl, scheduler_tamrl
+        )
+
+        checkpoint_path = os.path.join(output_path, 'forward_model.pt')
+        torch.save(forward_model.state_dict(), checkpoint_path)
+        print(f"Forward model saved to: {checkpoint_path}")
+
+        checkpoint_path = os.path.join(output_path, 'inverse_model.pt')
+        torch.save(inverse_model.state_dict(), checkpoint_path)
+        print(f"Inverse model saved to: {checkpoint_path}")
+    else:
+        checkpoint_path = os.path.join(output_path, 'model.pt')
+        torch.save(best_model_state, checkpoint_path)
+        print(f"Model saved to: {checkpoint_path}")
     
     print("\nDone")
 

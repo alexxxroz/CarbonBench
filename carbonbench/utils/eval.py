@@ -78,7 +78,7 @@ def eval_tree_model(
     for target in targets:
         res[target] = pd.DataFrame(res[target])
         r = res[target]
-        print(f"{target}:\t{r['R2'].mean():.3f}\t{r['RMSE'].mean():.3f}\t{r['RAE'].mean():.3f}\t{r['nMAE'].mean():.3f}")
+        print(f"{target}:\t{r['R2'].median():.3f}\t{r['RMSE'].mean():.3f}\t{r['RAE'].median():.3f}\t{r['nMAE'].median():.3f}")
     return res
 
 def _eval_model_common(
@@ -111,7 +111,7 @@ def _eval_model_common(
     for target in targets:
         res[target] = pd.DataFrame(res[target])
         r = res[target]
-        print(f"{target}:\t{r['R2'].mean():.3f}\t{r['RMSE'].mean():.3f}\t{r['RAE'].mean():.3f}\t{r['nMAE'].mean():.3f}")
+        print(f"{target}:\t{r['R2'].median():.3f}\t{r['RMSE'].median():.3f}\t{r['RAE'].mean():.3f}\t{r['nMAE'].median():.3f}")
     return res
 
 def append_results(

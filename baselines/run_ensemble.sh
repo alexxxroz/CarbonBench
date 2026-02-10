@@ -13,7 +13,7 @@
 source ~/.bashrc
 conda activate ct-lstm
 
-MODELS=("mlp") #"lstm" "gru" "ctlstm" "transformer"
+MODELS=("transformer") #"lstm" "gru" "ctlstm" "transformer"
 SPLITS=("IGBP" "Koppen")
 
 SEEDS=(27 28 29 30 31 32 33 34 35 36)
@@ -38,7 +38,7 @@ echo "Model: $MODEL"
 echo "Split: $SPLIT"
 echo "Seed: $SEED"
 
-python train_single_fix.py \
+python train_single.py \
     --model $MODEL \
     --split_type $SPLIT \
     --seed $SEED \
