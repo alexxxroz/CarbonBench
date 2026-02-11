@@ -46,10 +46,16 @@ pip install -e ".[dev]"
 
 ## Data
 
-Download the benchmark data from Zenodo (link TBD) and place it in the `data/` directory:
+Download the benchmark data from [Hugging Face](https://huggingface.co/datasets/alexroz/CarbonBench) into the `data/` directory:
 
 ```bash
+pip install huggingface_hub
 bash scripts/download_data.sh
+```
+
+Or manually:
+```bash
+huggingface-cli download alexroz/CarbonBench --repo-type dataset --local-dir data
 ```
 
 ## Quickstart
