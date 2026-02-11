@@ -1,4 +1,4 @@
-# CarbonBench: A global benchmark for zero-shot spatial transfer learning in carbon flux upscaling
+# CarbonBench: A Global Benchmark for Upscaling of Carbon Fluxes Using Zero-Shot Learning
 
 <p align="center">
   <img src="CarbonBench.png" width="700"/>
