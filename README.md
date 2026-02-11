@@ -141,14 +141,14 @@ tests/                # Unit tests
 
 ## Citation
 
-```bibtex
+<!-- ```bibtex
 @inproceedings{rozanov2025carbonbench,
   title={CarbonBench: A Global Benchmark for Upscaling of Carbon Fluxes Using Zero-Shot Learning},
   author={Rozanov, Aleksei and Renganathan, Arvind and Zhang, Yimeng and Kumar, Vipin},
   booktitle={Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
   year={2025}
 }
-```
+``` -->
 
 ## License
 
