@@ -35,6 +35,15 @@ CarbonBench provides two complementary stratified site-holdout splits for zero-s
 
 ## Installation
 
+First, create and activate a virtual environment:
+
+```bash
+python -m venv carbonbench-env
+source carbonbench-env/bin/activate  # On Windows: carbonbench-env\Scripts\activate
+```
+
+Then install the package:
+
 ```bash
 pip install -e .
 ```
@@ -45,6 +54,24 @@ pip install -e ".[dev]"
 ```
 
 ## Data
+
+First, install Git LFS (Large File Storage) if you haven't already:
+
+```bash
+# Ubuntu/Debian
+sudo apt install git-lfs
+
+# macOS
+brew install git-lfs
+
+# Windows (using chocolatey)
+choco install git-lfs
+```
+
+Then initialize it:
+```bash
+git lfs install
+```
 
 Download the benchmark data from [Hugging Face](https://huggingface.co/datasets/alexroz/CarbonBench) into the `data/` directory:
 

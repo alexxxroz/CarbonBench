@@ -20,6 +20,8 @@ dependencies = [
     "seaborn>=0.12",
     "xgboost>=1.7",
     "cartopy>=0.21",
+    "pyarrow>=10.0",
+    "fastparquet>=0.8",
 ]
 
 [project.optional-dependencies]

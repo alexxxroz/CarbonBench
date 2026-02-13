@@ -11,10 +11,9 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
+from pathlib import Path
 
-BASE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.join(BASE, "..", "..")
-DATA = os.path.join(ROOT, "data")
+DATA = Path(__file__).resolve().parents[2] / "data"
 
 def load_targets(
         targets: list=['GPP_NT_VUT_USTAR50', 'RECO_NT_VUT_USTAR50', 'NEE_VUT_USTAR50'],
