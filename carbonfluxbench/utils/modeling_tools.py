@@ -37,7 +37,7 @@ class CustomLoss(torch.nn.Module):
             koppen = weights.reshape(koppen.shape)
             
         # Carbon balance constraint: NEE = -GPP + RECO
-        if targets.shape[-1]==6:
+        if targets.shape[-1]==3:
             balance_nee = -(preds[:,:, 0]-preds[:,:, 1]) # -(GPP-RECO)
             balance_error = self.mse(preds[:,:,2], balance_nee)
         else:

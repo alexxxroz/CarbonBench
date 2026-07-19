@@ -64,7 +64,10 @@ def eval_tree_model(
         X_site, y_site = X_test[X_test.site==site].drop('site', axis=1), y_test[X_test.site==site]
         if method=='xgb':
             X_site = xgb.DMatrix(X_site, enable_categorical=True)
-        preds = y_scaler.inverse_transform(model.predict(X_site))
+        preds = model.predict(X_site)
+        if method == 'tabpfn':
+            preds = np.asarray(preds).reshape(-1, 1)
+        preds = y_scaler.inverse_transform(preds)
         y_site = y_scaler.inverse_transform(y_site)
         for idx, target in enumerate(targets):
             res[target]['site'].append(site)
